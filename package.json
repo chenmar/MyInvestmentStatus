@@ -1,7 +1,7 @@
 {
   "name": "myinvestmentstatus",
   "main": "expo-router/entry",
-  "homepage": "https://chenmar.github.io/MyInvestmentStatus",
+  "homepage": "https://chenmar.github.io/MyInvestmentStatus/",
   "version": "1.0.0",
   "scripts": {
     "start": "expo start",
