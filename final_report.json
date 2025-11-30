@@ -1,0 +1,596 @@
+{
+    "Summary_By_Period": [
+        {
+            "Period": "2020",
+            "User_Return": 5.39,
+            "SPX_Return": 18.4,
+            "NDX_Return": 47.58,
+            "VIX_Fear_Index_YearEnd": 22.75,
+            "Total_Fees_Paid": 864.65,
+            "Management_Fees_Only": 60.0,
+            "Management_Fee_Percent": 0.183,
+            "Avg_AUM": 32869.17
+        },
+        {
+            "Period": "2021",
+            "User_Return": -20.07,
+            "SPX_Return": 28.71,
+            "NDX_Return": 26.63,
+            "VIX_Fear_Index_YearEnd": 17.22,
+            "Total_Fees_Paid": 283.05,
+            "Management_Fees_Only": 135.0,
+            "Management_Fee_Percent": 0.355,
+            "Avg_AUM": 38048.17
+        },
+        {
+            "Period": "2022",
+            "User_Return": -48.31,
+            "SPX_Return": -18.11,
+            "NDX_Return": -32.97,
+            "VIX_Fear_Index_YearEnd": 21.67,
+            "Total_Fees_Paid": 265.91,
+            "Management_Fees_Only": 180.0,
+            "Management_Fee_Percent": 1.176,
+            "Avg_AUM": 15307.08
+        },
+        {
+            "Period": "2023",
+            "User_Return": 74.99,
+            "SPX_Return": 26.29,
+            "NDX_Return": 53.81,
+            "VIX_Fear_Index_YearEnd": 12.45,
+            "Total_Fees_Paid": 1765.66,
+            "Management_Fees_Only": 180.0,
+            "Management_Fee_Percent": 1.117,
+            "Avg_AUM": 16119.83
+        },
+        {
+            "Period": "2024",
+            "User_Return": 44.95,
+            "SPX_Return": 25.02,
+            "NDX_Return": 24.88,
+            "VIX_Fear_Index_YearEnd": 12.0,
+            "Total_Fees_Paid": 2539.35,
+            "Management_Fees_Only": 150.0,
+            "Management_Fee_Percent": 0.247,
+            "Avg_AUM": 60668.33
+        },
+        {
+            "Period": "2025",
+            "User_Return": 35.68,
+            "SPX_Return": 17.81,
+            "NDX_Return": 21.05,
+            "VIX_Fear_Index_YearEnd": 15.0,
+            "Total_Fees_Paid": 0.0,
+            "Management_Fees_Only": 0.0,
+            "Management_Fee_Percent": 0.0,
+            "Avg_AUM": 251913.64
+        },
+        {
+            "Period": "Last 2 Years (2024-2025)",
+            "User_Return": 96.68,
+            "SPX_Return": 47.29,
+            "NDX_Return": 51.17,
+            "VIX_Avg_Fear_Index": 13.5,
+            "Total_Fees_Paid": 2539.35,
+            "Management_Fee_Percent": "N/A"
+        },
+        {
+            "Period": "Last 3 Years (2023-2025)",
+            "User_Return": 244.18,
+            "SPX_Return": 86.01,
+            "NDX_Return": 132.51,
+            "VIX_Avg_Fear_Index": 13.15,
+            "Total_Fees_Paid": 4305.01,
+            "Management_Fee_Percent": "N/A"
+        },
+        {
+            "Period": "Last 5 Years (2021-2025)",
+            "User_Return": 42.19,
+            "SPX_Return": 96.05,
+            "NDX_Return": 97.35,
+            "VIX_Avg_Fear_Index": 15.67,
+            "Total_Fees_Paid": 4853.97,
+            "Management_Fee_Percent": "N/A"
+        }
+    ],
+    "Monthly_Data": [
+        {
+            "Year": 2020,
+            "Month": "ינואר",
+            "User_Monthly_Return": 0.0,
+            "Fees_Paid_This_Month": 379.73,
+            "Account_Value": 20000.0
+        },
+        {
+            "Year": 2020,
+            "Month": "פברואר",
+            "User_Monthly_Return": -6.17,
+            "Fees_Paid_This_Month": 167.46,
+            "Account_Value": 23423.0
+        },
+        {
+            "Year": 2020,
+            "Month": "מרץ",
+            "User_Monthly_Return": -12.75,
+            "Fees_Paid_This_Month": 39.0,
+            "Account_Value": 24111.0
+        },
+        {
+            "Year": 2020,
+            "Month": "אפריל",
+            "User_Monthly_Return": 9.94,
+            "Fees_Paid_This_Month": 51.72,
+            "Account_Value": 26509.0
+        },
+        {
+            "Year": 2020,
+            "Month": "מאי",
+            "User_Monthly_Return": 0.68,
+            "Fees_Paid_This_Month": 17.78,
+            "Account_Value": 26690.0
+        },
+        {
+            "Year": 2020,
+            "Month": "יוני",
+            "User_Monthly_Return": -4.17,
+            "Fees_Paid_This_Month": 24.11,
+            "Account_Value": 25575.0
+        },
+        {
+            "Year": 2020,
+            "Month": "יולי",
+            "User_Monthly_Return": 0.01,
+            "Fees_Paid_This_Month": 16.0,
+            "Account_Value": 25578.0
+        },
+        {
+            "Year": 2020,
+            "Month": "אוגוסט",
+            "User_Monthly_Return": 7.2,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 44063.0
+        },
+        {
+            "Year": 2020,
+            "Month": "ספטמבר",
+            "User_Monthly_Return": -5.63,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 41579.0
+        },
+        {
+            "Year": 2020,
+            "Month": "אוקטובר",
+            "User_Monthly_Return": -2.45,
+            "Fees_Paid_This_Month": 32.0,
+            "Account_Value": 40557.0
+        },
+        {
+            "Year": 2020,
+            "Month": "נובמבר",
+            "User_Monthly_Return": 14.56,
+            "Fees_Paid_This_Month": 87.28,
+            "Account_Value": 46466.0
+        },
+        {
+            "Year": 2020,
+            "Month": "דצמבר",
+            "User_Monthly_Return": 7.34,
+            "Fees_Paid_This_Month": 49.57,
+            "Account_Value": 49879.0
+        },
+        {
+            "Year": 2021,
+            "Month": "ינואר",
+            "User_Monthly_Return": 1.72,
+            "Fees_Paid_This_Month": 56.21,
+            "Account_Value": 50737.0
+        },
+        {
+            "Year": 2021,
+            "Month": "פברואר",
+            "User_Monthly_Return": -6.12,
+            "Fees_Paid_This_Month": 49.34,
+            "Account_Value": 47631.0
+        },
+        {
+            "Year": 2021,
+            "Month": "מרץ",
+            "User_Monthly_Return": -3.62,
+            "Fees_Paid_This_Month": 20.21,
+            "Account_Value": 45906.0
+        },
+        {
+            "Year": 2021,
+            "Month": "אפריל",
+            "User_Monthly_Return": 0.89,
+            "Fees_Paid_This_Month": 24.58,
+            "Account_Value": 46316.0
+        },
+        {
+            "Year": 2021,
+            "Month": "מאי",
+            "User_Monthly_Return": -6.29,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 33521.0
+        },
+        {
+            "Year": 2021,
+            "Month": "יוני",
+            "User_Monthly_Return": 10.12,
+            "Fees_Paid_This_Month": 15.03,
+            "Account_Value": 36915.0
+        },
+        {
+            "Year": 2021,
+            "Month": "יולי",
+            "User_Monthly_Return": -8.38,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 33821.0
+        },
+        {
+            "Year": 2021,
+            "Month": "אוגוסט",
+            "User_Monthly_Return": -2.54,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 32961.0
+        },
+        {
+            "Year": 2021,
+            "Month": "ספטמבר",
+            "User_Monthly_Return": -3.33,
+            "Fees_Paid_This_Month": 23.0,
+            "Account_Value": 31861.0
+        },
+        {
+            "Year": 2021,
+            "Month": "אוקטובר",
+            "User_Monthly_Return": 4.69,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 33358.0
+        },
+        {
+            "Year": 2021,
+            "Month": "נובמבר",
+            "User_Monthly_Return": -1.77,
+            "Fees_Paid_This_Month": 19.65,
+            "Account_Value": 32765.0
+        },
+        {
+            "Year": 2021,
+            "Month": "דצמבר",
+            "User_Monthly_Return": -6.03,
+            "Fees_Paid_This_Month": 15.03,
+            "Account_Value": 30786.0
+        },
+        {
+            "Year": 2022,
+            "Month": "ינואר",
+            "User_Monthly_Return": -3.35,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 20130.0
+        },
+        {
+            "Year": 2022,
+            "Month": "פברואר",
+            "User_Monthly_Return": 1.68,
+            "Fees_Paid_This_Month": 16.2,
+            "Account_Value": 20470.0
+        },
+        {
+            "Year": 2022,
+            "Month": "מרץ",
+            "User_Monthly_Return": 1.27,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 20730.0
+        },
+        {
+            "Year": 2022,
+            "Month": "אפריל",
+            "User_Monthly_Return": -24.37,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 15677.0
+        },
+        {
+            "Year": 2022,
+            "Month": "מאי",
+            "User_Monthly_Return": -5.44,
+            "Fees_Paid_This_Month": 39.0,
+            "Account_Value": 14823.0
+        },
+        {
+            "Year": 2022,
+            "Month": "יוני",
+            "User_Monthly_Return": -4.78,
+            "Fees_Paid_This_Month": 43.68,
+            "Account_Value": 14114.0
+        },
+        {
+            "Year": 2022,
+            "Month": "יולי",
+            "User_Monthly_Return": 11.06,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 15676.0
+        },
+        {
+            "Year": 2022,
+            "Month": "אוגוסט",
+            "User_Monthly_Return": -5.09,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 14877.0
+        },
+        {
+            "Year": 2022,
+            "Month": "ספטמבר",
+            "User_Monthly_Return": -18.27,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 12158.0
+        },
+        {
+            "Year": 2022,
+            "Month": "אוקטובר",
+            "User_Monthly_Return": -3.17,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 11772.0
+        },
+        {
+            "Year": 2022,
+            "Month": "נובמבר",
+            "User_Monthly_Return": 6.15,
+            "Fees_Paid_This_Month": 39.0,
+            "Account_Value": 12496.0
+        },
+        {
+            "Year": 2022,
+            "Month": "דצמבר",
+            "User_Monthly_Return": -13.87,
+            "Fees_Paid_This_Month": 23.03,
+            "Account_Value": 10762.0
+        },
+        {
+            "Year": 2023,
+            "Month": "ינואר",
+            "User_Monthly_Return": 17.11,
+            "Fees_Paid_This_Month": 32.03,
+            "Account_Value": 12604.0
+        },
+        {
+            "Year": 2023,
+            "Month": "פברואר",
+            "User_Monthly_Return": 5.25,
+            "Fees_Paid_This_Month": 16.2,
+            "Account_Value": 13266.0
+        },
+        {
+            "Year": 2023,
+            "Month": "מרץ",
+            "User_Monthly_Return": 6.39,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 14115.0
+        },
+        {
+            "Year": 2023,
+            "Month": "אפריל",
+            "User_Monthly_Return": -0.02,
+            "Fees_Paid_This_Month": 15.0,
+            "Account_Value": 14111.0
+        },
+        {
+            "Year": 2023,
+            "Month": "מאי",
+            "User_Monthly_Return": 12.6,
+            "Fees_Paid_This_Month": 125.56,
+            "Account_Value": 15889.0
+        },
+        {
+            "Year": 2023,
+            "Month": "יוני",
+            "User_Monthly_Return": 9.76,
+            "Fees_Paid_This_Month": 222.11,
+            "Account_Value": 17441.0
+        },
+        {
+            "Year": 2023,
+            "Month": "יולי",
+            "User_Monthly_Return": 13.82,
+            "Fees_Paid_This_Month": 242.21,
+            "Account_Value": 19852.0
+        },
+        {
+            "Year": 2023,
+            "Month": "אוגוסט",
+            "User_Monthly_Return": -5.65,
+            "Fees_Paid_This_Month": 201.0,
+            "Account_Value": 18729.0
+        },
+        {
+            "Year": 2023,
+            "Month": "ספטמבר",
+            "User_Monthly_Return": -14.55,
+            "Fees_Paid_This_Month": 183.27,
+            "Account_Value": 16003.0
+        },
+        {
+            "Year": 2023,
+            "Month": "אוקטובר",
+            "User_Monthly_Return": -3.29,
+            "Fees_Paid_This_Month": 255.01,
+            "Account_Value": 15475.0
+        },
+        {
+            "Year": 2023,
+            "Month": "נובמבר",
+            "User_Monthly_Return": 10.62,
+            "Fees_Paid_This_Month": 302.62,
+            "Account_Value": 17119.0
+        },
+        {
+            "Year": 2023,
+            "Month": "דצמבר",
+            "User_Monthly_Return": 10.01,
+            "Fees_Paid_This_Month": 155.65,
+            "Account_Value": 18834.0
+        },
+        {
+            "Year": 2024,
+            "Month": "ינואר",
+            "User_Monthly_Return": -3.57,
+            "Fees_Paid_This_Month": 231.78,
+            "Account_Value": 5818.0
+        },
+        {
+            "Year": 2024,
+            "Month": "פברואר",
+            "User_Monthly_Return": 1.52,
+            "Fees_Paid_This_Month": 275.46,
+            "Account_Value": 5907.0
+        },
+        {
+            "Year": 2024,
+            "Month": "מרץ",
+            "User_Monthly_Return": -9.53,
+            "Fees_Paid_This_Month": 159.0,
+            "Account_Value": 5344.0
+        },
+        {
+            "Year": 2024,
+            "Month": "אפריל",
+            "User_Monthly_Return": -4.19,
+            "Fees_Paid_This_Month": 55.0,
+            "Account_Value": 5120.0
+        },
+        {
+            "Year": 2024,
+            "Month": "מאי",
+            "User_Monthly_Return": 11.2,
+            "Fees_Paid_This_Month": 215.0,
+            "Account_Value": 62726.0
+        },
+        {
+            "Year": 2024,
+            "Month": "יוני",
+            "User_Monthly_Return": 7.25,
+            "Fees_Paid_This_Month": 157.4,
+            "Account_Value": 76527.0
+        },
+        {
+            "Year": 2024,
+            "Month": "יולי",
+            "User_Monthly_Return": 3.99,
+            "Fees_Paid_This_Month": 215.97,
+            "Account_Value": 79582.0
+        },
+        {
+            "Year": 2024,
+            "Month": "אוגוסט",
+            "User_Monthly_Return": 2.38,
+            "Fees_Paid_This_Month": 279.0,
+            "Account_Value": 81483.0
+        },
+        {
+            "Year": 2024,
+            "Month": "ספטמבר",
+            "User_Monthly_Return": 2.82,
+            "Fees_Paid_This_Month": 145.18,
+            "Account_Value": 83786.0
+        },
+        {
+            "Year": 2024,
+            "Month": "אוקטובר",
+            "User_Monthly_Return": -2.22,
+            "Fees_Paid_This_Month": 356.91,
+            "Account_Value": 83902.0
+        },
+        {
+            "Year": 2024,
+            "Month": "נובמבר",
+            "User_Monthly_Return": 26.59,
+            "Fees_Paid_This_Month": 448.65,
+            "Account_Value": 114582.0
+        },
+        {
+            "Year": 2024,
+            "Month": "דצמבר",
+            "User_Monthly_Return": 5.71,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 123243.0
+        },
+        {
+            "Year": 2025,
+            "Month": "ינואר",
+            "User_Monthly_Return": 8.52,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 118966.0
+        },
+        {
+            "Year": 2025,
+            "Month": "פברואר",
+            "User_Monthly_Return": -8.92,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 119189.0
+        },
+        {
+            "Year": 2025,
+            "Month": "מרץ",
+            "User_Monthly_Return": 8.5,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 131495.0
+        },
+        {
+            "Year": 2025,
+            "Month": "אפריל",
+            "User_Monthly_Return": 13.71,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 256265.0
+        },
+        {
+            "Year": 2025,
+            "Month": "מאי",
+            "User_Monthly_Return": 7.02,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 276334.0
+        },
+        {
+            "Year": 2025,
+            "Month": "יוני",
+            "User_Monthly_Return": -1.23,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 274883.0
+        },
+        {
+            "Year": 2025,
+            "Month": "יולי",
+            "User_Monthly_Return": 5.9,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 293262.0
+        },
+        {
+            "Year": 2025,
+            "Month": "אוגוסט",
+            "User_Monthly_Return": 0.96,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 313114.0
+        },
+        {
+            "Year": 2025,
+            "Month": "ספטמבר",
+            "User_Monthly_Return": 7.41,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 338453.0
+        },
+        {
+            "Year": 2025,
+            "Month": "אוקטובר",
+            "User_Monthly_Return": -4.18,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 324305.0
+        },
+        {
+            "Year": 2025,
+            "Month": "נובמבר",
+            "User_Monthly_Return": -4.34,
+            "Fees_Paid_This_Month": 0.0,
+            "Account_Value": 324784.0
+        }
+    ]
+}
