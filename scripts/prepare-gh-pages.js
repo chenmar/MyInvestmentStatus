@@ -1,0 +1,40 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+function copyDirSync(src, dest) {
+  if (!fs.existsSync(src)) return;
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
+}
+
+const projectName = 'MyInvestmentStatus';
+const dist = path.join(__dirname, '..', 'dist');
+const src = path.join(dist, '_expo');
+const dest = path.join(dist, projectName, '_expo');
+
+copyDirSync(src, dest);
+console.log(`Copied ${src} -> ${dest}`);
+
+// Ensure Jekyll is disabled on GitHub Pages so directories starting with
+// underscores (like `_expo`) are served. Create an empty .nojekyll at the
+// root of `dist` and inside the repo subfolder.
+try {
+  const nojekyllRoot = path.join(dist, '.nojekyll');
+  fs.writeFileSync(nojekyllRoot, '');
+  const nojekyllSub = path.join(dist, projectName, '.nojekyll');
+  fs.mkdirSync(path.join(dist, projectName), { recursive: true });
+  fs.writeFileSync(nojekyllSub, '');
+  console.log('Created .nojekyll in dist and dist/MyInvestmentStatus');
+} catch (err) {
+  console.warn('Could not create .nojekyll:', err.message);
+}

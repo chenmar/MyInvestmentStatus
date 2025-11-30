@@ -10,9 +10,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "predeploy": "npx expo export -p web",
+    "predeploy": "npx expo export -p web && node ./scripts/fix-paths.js && node ./scripts/prepare-gh-pages.js",
     "deploy": "gh-pages -d dist"
-  },
+ },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@react-navigation/bottom-tabs": "^7.4.0",
