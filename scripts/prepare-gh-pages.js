@@ -20,10 +20,16 @@ function copyDirSync(src, dest) {
 const projectName = 'MyInvestmentStatus';
 const dist = path.join(__dirname, '..', 'dist');
 const src = path.join(dist, '_expo');
-const dest = path.join(dist, projectName, '_expo');
+const destUnderscored = path.join(dist, projectName, '_expo');
+const destStatic = path.join(dist, projectName, 'expo-static');
+const destStaticRoot = path.join(dist, 'expo-static');
 
-copyDirSync(src, dest);
-console.log(`Copied ${src} -> ${dest}`);
+// Copy original `_expo` (if present) into both a non-underscored folder
+// `expo-static` and keep the underscored copy as well.
+copyDirSync(src, destUnderscored);
+copyDirSync(src, destStatic);
+copyDirSync(src, destStaticRoot);
+console.log(`Copied ${src} -> ${destUnderscored}, ${destStatic}, ${destStaticRoot}`);
 
 // Ensure Jekyll is disabled on GitHub Pages so directories starting with
 // underscores (like `_expo`) are served. Create an empty .nojekyll at the
