@@ -35,6 +35,12 @@ copyDirSync(src, destStaticRoot);
 // Also copy assets into the project subfolder so /MyInvestmentStatus/assets/... exists
 copyDirSync(srcAssets, destAssets);
 copyDirSync(srcAssets, path.join(dist, 'MyInvestmentStatus', 'assets'));
+
+// Copy expo-router assets into a safe folder (no "node_modules" in the name)
+const expoRouterSrc = path.join(srcAssets, 'node_modules', 'expo-router', 'assets');
+const expoRouterDest = path.join(dist, projectName, 'assets', 'expo-router-assets');
+copyDirSync(expoRouterSrc, expoRouterDest);
+
 console.log(`Copied ${src} -> ${destUnderscored}, ${destStatic}, ${destStaticRoot}`);
 
 // Ensure Jekyll is disabled on GitHub Pages so directories starting with

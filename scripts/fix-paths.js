@@ -15,15 +15,17 @@ function rewriteFile(filePath) {
 	content = content.replace(/src="\/_expo\//g, 'src="/MyInvestmentStatus/expo-static/');
 	content = content.replace(/src="\.\/\_expo\//g, 'src="./expo-static/');
 
-	// Map absolute asset paths to repository subpath so GitHub Pages serves them
-	content = content.replace(/"\/assets\//g, '"/MyInvestmentStatus/assets/');
-	content = content.replace(/'\/assets\//g, "'/MyInvestmentStatus/assets/");
-	content = content.replace(/"\/node_modules\//g, '"/MyInvestmentStatus/node_modules/');
-	content = content.replace(/'\/node_modules\//g, "'/MyInvestmentStatus/node_modules/");
+  // Map absolute asset paths to repository subpath so GitHub Pages serves them
+  content = content.replace(/"\/assets\//g, '"/MyInvestmentStatus/assets/');
+  content = content.replace(/'\/assets\//g, "'/MyInvestmentStatus/assets/");
 
-	// Also handle any bare /assets/ occurrences
-	content = content.replace(/(?<!:)\/assets\//g, '/MyInvestmentStatus/assets/');
+  // Replace node_modules/expo-router asset references with a safe folder name
+  content = content.replace(/\/MyInvestmentStatus\/assets\/node_modules\/expo-router\/assets\//g, '/MyInvestmentStatus/assets/expo-router-assets/');
+  content = content.replace(/\/assets\/node_modules\/expo-router\/assets\//g, '/MyInvestmentStatus/assets/expo-router-assets/');
+  content = content.replace(/\.\/assets\/node_modules\/expo-router\/assets\//g, './assets/expo-router-assets/');
 
+  // Also handle any bare /assets/ occurrences
+  content = content.replace(/(?<!:)\/assets\//g, '/MyInvestmentStatus/assets/');
 	fs.writeFileSync(filePath, content, 'utf8');
 }
 
