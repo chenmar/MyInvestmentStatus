@@ -50,3 +50,38 @@ try {
 } catch (err) {
   console.warn('Could not create .nojekyll:', err.message);
 }
+
+// Create a SPA-friendly 404 page so GitHub Pages will load the app for any path.
+try {
+  const repoBase = '/' + projectName;
+  const fallback = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Redirecting…</title>
+    <script>
+      (function() {
+        var repoBase = '${repoBase}';
+        var indexPath = repoBase + '/index.html';
+        fetch(indexPath).then(function(r){ return r.text(); }).then(function(html){
+          document.open();
+          document.write(html);
+          document.close();
+          history.replaceState({}, '', location.pathname + location.search + location.hash);
+        }).catch(function(){ location.href = repoBase + '/'; });
+      })();
+    </script>
+  </head>
+  <body></body>
+</html>`;
+
+  const fallbackRoot = path.join(dist, '404.html');
+  const fallbackSub = path.join(dist, projectName, '404.html');
+  fs.writeFileSync(fallbackRoot, fallback);
+  fs.writeFileSync(fallbackSub, fallback);
+  console.log('Created SPA 404 fallback in dist and dist/' + projectName);
+} catch (err) {
+  console.warn('Could not create 404 fallback:', err.message);
+}
