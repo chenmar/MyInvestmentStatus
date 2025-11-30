@@ -24,11 +24,17 @@ const destUnderscored = path.join(dist, projectName, '_expo');
 const destStatic = path.join(dist, projectName, 'expo-static');
 const destStaticRoot = path.join(dist, 'expo-static');
 
+const srcAssets = path.join(dist, 'assets');
+const destAssets = path.join(dist, projectName, 'assets');
+
 // Copy original `_expo` (if present) into both a non-underscored folder
 // `expo-static` and keep the underscored copy as well.
 copyDirSync(src, destUnderscored);
 copyDirSync(src, destStatic);
 copyDirSync(src, destStaticRoot);
+// Also copy assets into the project subfolder so /MyInvestmentStatus/assets/... exists
+copyDirSync(srcAssets, destAssets);
+copyDirSync(srcAssets, path.join(dist, 'MyInvestmentStatus', 'assets'));
 console.log(`Copied ${src} -> ${destUnderscored}, ${destStatic}, ${destStaticRoot}`);
 
 // Ensure Jekyll is disabled on GitHub Pages so directories starting with
