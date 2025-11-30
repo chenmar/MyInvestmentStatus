@@ -37,6 +37,7 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+myinvestmentstatus-6cd1e-firebase-adminsdk-fbsvc-b032b1cb8e.json
 
 # generated native folders
 /ios

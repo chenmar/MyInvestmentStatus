@@ -15,10 +15,19 @@ MY_USERNAME = ""
 MY_PASSWORD = ""  
 
 DOWNLOAD_DIR = r"C:\Users\Chen\Downloads"
-TARGET_DIR = r"C:\Users\Chen\Desktop\code\Investments\myExcels"
+
+# --- CHANGE START: DYNAMIC PATH ---
+# Get the directory where this script is currently located
+current_script_dir = os.path.dirname(os.path.abspath(__file__))
+# Set target directory to a 'temp' folder inside that directory
+TARGET_DIR = os.path.join(current_script_dir, "temp")
+# --- CHANGE END ---
+
 LOG_DIR = os.path.join(TARGET_DIR, "logs")
 YEARS = [2024, 2023, 2022, 2021, 2020, 2019, 2018, 2017, 2016, 2015, 2014]
 
+# Ensure the temp directory and logs directory exist
+os.makedirs(TARGET_DIR, exist_ok=True)
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # ================================
@@ -78,7 +87,7 @@ def move_excel_with_hash(target_name):
 
     shutil.move(src, dst)
     logging.info(f"✅ Saved: {target_name}")
-    print(f"   ✅ Successfully saved: {target_name}")
+    print(f"   ✅ Successfully saved: {target_name} in {TARGET_DIR}")
 
 def wait_for_loader(driver):
     """Waits for the spinner/loader to disappear"""
@@ -116,6 +125,7 @@ def export_excel(target_name, driver):
 # ================================
 
 print("--- Script Started ---")
+print(f"📂 Output Folder: {TARGET_DIR}")
 
 if not MY_USERNAME:
     username_input = input("Username: ")

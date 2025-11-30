@@ -15,11 +15,20 @@ from selenium.common.exceptions import TimeoutException, ElementClickIntercepted
 MY_USERNAME = ""  
 MY_PASSWORD = ""  
 
-TARGET_DIR = r"C:\Users\Chen\Desktop\code\Investments\myExcels"
+# --- CHANGED: Now uses a relative path relative to the script's location ---
+# Get the directory where this script file is running
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Define a 'temp_data' folder inside the script's directory
+TARGET_DIR = os.path.join(BASE_DIR, "temp")
+
 LOG_DIR = os.path.join(TARGET_DIR, "logs")
 OUTPUT_JSON = os.path.join(TARGET_DIR, "yields_data.json")
 
+# Create the directories if they don't exist
 os.makedirs(LOG_DIR, exist_ok=True)
+
+print(f"📂 Saving data to: {TARGET_DIR}")
 
 # ================================
 #   LOGGING

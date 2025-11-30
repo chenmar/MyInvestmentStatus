@@ -1,6 +1,7 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Dimensions,
     LayoutAnimation,
     Modal,
@@ -18,9 +19,11 @@ import {
 import { BarChart, LineChart } from "react-native-gifted-charts";
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
-// טעינת הנתונים
-import reportData from '../final_report.json';
+// Firebase Imports
+import { doc, getDoc } from "firebase/firestore";
+import { db } from '../firebaseConfig';
 
+// הפעלת אנימציות לאנדרואיד
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
     UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -37,20 +40,27 @@ const HEBREW_TO_ENGLISH_MONTHS: Record<string, string> = {
     "ת. מצטברת": "Total", "ת. ממוצעת": "Avg", "ת. יומית": "Daily"
 };
 
-// --- HELPER: Data Logic ---
+// --- HELPER: Data Logic (Safe) ---
 const getSummaryForRange = (range: string, data: any) => {
+    // הגנה מפני דאטה חסר
+    if (!data || !data.Summary_By_Period) return {};
+
+    // 1. טיפול בטווח 1M
     if (range === '1M') {
-        const lastMonth = data.Monthly_Data[data.Monthly_Data.length - 1];
+        const monthlyData = data.Monthly_Data || [];
+        const lastMonth = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1] : {};
+        
         return {
             Period: 'Last Month',
-            User_Return: lastMonth?.User_Monthly_Return || 0,
+            User_Return: lastMonth.User_Monthly_Return || 0,
             SPX_Return: 3.2, 
             NDX_Return: 4.1,
-            Total_Fees_Paid: lastMonth?.Fees_Paid_This_Month || 0,
+            Total_Fees_Paid: lastMonth.Fees_Paid_This_Month || 0,
             SingleMonthData: lastMonth 
         };
     }
 
+    // 2. טיפול בטווחים שנתיים
     const map: any = {
         'YTD': '2025',
         '1Y': '2024',
@@ -61,8 +71,10 @@ const getSummaryForRange = (range: string, data: any) => {
     };
     const key = map[range] || '2024';
     
-    return data.Summary_By_Period.find((p: any) => p.Period.includes(key)) || 
-           data.Summary_By_Period.find((p: any) => p.Period === '2024');
+    const summary = data.Summary_By_Period.find((p: any) => p.Period && p.Period.includes(key));
+    
+    // אם לא מצאנו את השנה המבוקשת, ננסה להחזיר את הראשונה או אובייקט ריק (ולא את 2024 בכוח)
+    return summary || data.Summary_By_Period[0] || {};
 };
 
 // --- COMPONENT: Settings Modal ---
@@ -121,16 +133,17 @@ const MiniTimeFrameSelector = ({ selected, onSelect, options }: { selected: stri
     );
 };
 
-// 1. PERFORMANCE CARD
+// 1. PERFORMANCE CARD (Safe)
 const PerformanceCard = ({ data, showNumbers }: { data: any, showNumbers: boolean }) => {
   const [range, setRange] = useState('1Y');
-  const summaryData = getSummaryForRange(range, data) || {};
+  const summaryData = getSummaryForRange(range, data);
 
-  const userReturn = summaryData.User_Return || 0;
-  const spxReturn = summaryData.SPX_Return || 0;
-  const ndxReturn = summaryData.NDX_Return || 0;
+  // שימוש בערכי ברירת מחדל אם הנתונים חסרים
+  const userReturn = summaryData?.User_Return ?? 0;
+  const spxReturn = summaryData?.SPX_Return ?? 0;
+  const ndxReturn = summaryData?.NDX_Return ?? 0;
 
-  const avgAum = summaryData.Avg_AUM || 0;
+  const avgAum = summaryData?.Avg_AUM ?? 0;
   const totalMoneyMade = avgAum * (userReturn / 100);
 
   const isPositive = userReturn >= 0;
@@ -139,23 +152,28 @@ const PerformanceCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
   const gradientEnd = isPositive ? 'rgba(74, 222, 128, 0.01)' : 'rgba(248, 113, 113, 0.01)';
 
   let chartData = [{value: 0}];
+  const monthlyData = data?.Monthly_Data || [];
+
   if (['YTD', '1Y'].includes(range)) {
       const year = parseInt(range === 'YTD' ? '2025' : '2024');
-      const months = data.Monthly_Data.filter((m: any) => m.Year === year);
+      const months = monthlyData.filter((m: any) => m.Year === year);
       if (months.length > 0) {
           chartData = months.map((m: any) => ({
-              value: m.User_Monthly_Return,
-              label: HEBREW_TO_ENGLISH_MONTHS[m.Month]?.[0],
-              dataPointColor: m.User_Monthly_Return >= 0 ? '#4ADE80' : '#F87171'
+              value: m.User_Monthly_Return || 0,
+              label: HEBREW_TO_ENGLISH_MONTHS[m.Month]?.[0] || "?",
+              dataPointColor: (m.User_Monthly_Return || 0) >= 0 ? '#4ADE80' : '#F87171'
           }));
       }
+  } else if (range === '1M') {
+      chartData = [{value: 0}, {value: userReturn}];
   } else {
+      // Fallback graph
       chartData = [{value: 0}, {value: userReturn * 0.5}, {value: userReturn}];
   }
 
   const values = chartData.map(d => d.value);
-  const maxVal = Math.max(...values, 5);
-  const minVal = Math.min(...values, -5);
+  const maxVal = Math.max(...values, 2);
+  const minVal = Math.min(...values, -2);
   const yMax = maxVal + (Math.abs(maxVal) * 0.25);
   const yMin = minVal - (Math.abs(minVal) * 0.25);
 
@@ -167,7 +185,7 @@ const PerformanceCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
       <View style={styles.cardHeaderRow}>
         <View>
             <Text style={styles.cardTitle}>Performance</Text>
-            <Text style={styles.cardSubtitle}>{summaryData.Period}</Text>
+            <Text style={styles.cardSubtitle}>{summaryData?.Period || "No Data"}</Text>
         </View>
         <MiniTimeFrameSelector selected={range} onSelect={setRange} />
       </View>
@@ -230,7 +248,7 @@ const PerformanceCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
   );
 };
 
-// --- 2. FEAR & GREED ---
+// --- 2. FEAR & GREED (Safe) ---
 const MOCK_HISTORY = [
     { date: 'Today', value: 24, label: 'Extreme Fear' },
     { date: 'Yesterday', value: 22, label: 'Extreme Fear' },
@@ -273,7 +291,8 @@ const FearGreedGauge = ({ value }: { value: number }) => {
 
 const FearGreedCard = ({ data }: { data: any }) => {
     const [expanded, setExpanded] = useState(false);
-    const currentVix = 24; // Hardcoded based on your request
+    // שימוש בברירת מחדל אם אין נתונים
+    const currentVix = getSummaryForRange('YTD', data)?.Fear_Greed_Score || 24;
 
     const toggleExpand = () => {
         LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -288,7 +307,6 @@ const FearGreedCard = ({ data }: { data: any }) => {
             </View>
             
             <FearGreedGauge value={currentVix} />
-            
             <View style={styles.separator} />
             
             <TouchableOpacity onPress={toggleExpand} style={styles.expandButton}>
@@ -321,54 +339,48 @@ const FearGreedCard = ({ data }: { data: any }) => {
     );
 };
 
-// 3. COMMISSIONS CARD (Updated for Yearly Breakdown)
+// 3. COMMISSIONS CARD (Safe)
 const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolean }) => {
     const [range, setRange] = useState('1Y');
     const [expanded, setExpanded] = useState(false);
     
-    // נתוני סיכום כללי (הטקסט למעלה)
     const summaryData = getSummaryForRange(range, data);
-
-    if (!summaryData) return null;
-
-    const totalFees = summaryData.Total_Fees_Paid || 0;
-    const mgmtPercent = summaryData.Management_Fee_Percent;
     
-    const isSingleYear = !summaryData.Period.includes("Last");
+    // הגנה אם אין נתונים
+    const totalFees = summaryData?.Total_Fees_Paid ?? 0;
+    const mgmtPercent = summaryData?.Management_Fee_Percent ?? 0;
+    const periodLabel = summaryData?.Period ?? range;
+    
+    const isSingleYear = !periodLabel.includes("Last");
     let monthlyDetails: any[] = [];
     let barData: any[] = [];
     
-    // לוגיקה לגרף
     if (isSingleYear) {
-        // --- מצב שנה בודדת: גרף חודשי ---
-        const year = parseInt(summaryData.Period.includes('Month') ? '2025' : summaryData.Period);
+        const year = parseInt(periodLabel.includes('Month') ? '2025' : periodLabel);
+        const monthlyData = data?.Monthly_Data || [];
+        
         if (range === '1M') {
-             const lastMonth = data.Monthly_Data[data.Monthly_Data.length - 1];
-             monthlyDetails = [lastMonth];
+             const lastMonth = monthlyData.length > 0 ? monthlyData[monthlyData.length - 1] : null;
+             if(lastMonth) monthlyDetails = [lastMonth];
         } else {
-             monthlyDetails = data.Monthly_Data.filter((m: any) => m.Year === year);
+             monthlyDetails = monthlyData.filter((m: any) => m.Year === year);
         }
         
         barData = monthlyDetails.map((m: any) => ({
-            value: m.Fees_Paid_This_Month,
-            label: HEBREW_TO_ENGLISH_MONTHS[m.Month]?.substring(0,3),
+            value: m.Fees_Paid_This_Month || 0,
+            label: HEBREW_TO_ENGLISH_MONTHS[m.Month]?.substring(0,3) || m.Month,
             frontColor: '#F87171'
         }));
     } else {
-        // --- מצב רב-שנתי: גרף שנתי (עמודה לכל שנה) ---
-        // שולף רק את הסיכומים השנתיים (איפה שה-Period הוא מספר שנה, למשל "2023")
-        const allYearlySummaries = data.Summary_By_Period.filter((p: any) => /^\d{4}$/.test(p.Period));
-        
-        // ממיין לפי שנה
-        allYearlySummaries.sort((a: any, b: any) => parseInt(a.Period) - parseInt(b.Period));
+        const allYears = data?.Summary_By_Period?.filter((p: any) => /^\d{4}$/.test(p.Period)) || [];
+        allYears.sort((a: any, b: any) => parseInt(a.Period) - parseInt(b.Period));
 
-        // לוקח את X השנים האחרונות בהתאם לבחירה
         const yearsCount = range === '10Y' ? 10 : (range === '5Y' ? 5 : 3);
-        const relevantYears = allYearlySummaries.slice(-yearsCount);
+        const relevantYears = allYears.slice(-yearsCount);
 
         barData = relevantYears.map((yearData: any) => ({
-            value: yearData.Total_Fees_Paid,
-            label: yearData.Period.substring(2, 4), // '23, '24
+            value: yearData.Total_Fees_Paid || 0,
+            label: yearData.Period.substring(2, 4), 
             frontColor: '#F87171',
             topLabelComponent: () => showNumbers ? (
                 <Text style={{color: '#AAA', fontSize: 9, marginBottom: 2}}>
@@ -388,7 +400,7 @@ const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
             <View style={styles.cardHeaderColumn}>
                 <View style={styles.rowBetween}>
                     <Text style={styles.cardTitle}>Fees & Commissions</Text>
-                    <Text style={styles.cardSubtitle}>{summaryData.Period}</Text>
+                    <Text style={styles.cardSubtitle}>{periodLabel}</Text>
                 </View>
                 <View style={{marginTop: 12, width: '100%'}}>
                    <MiniTimeFrameSelector 
@@ -407,12 +419,10 @@ const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
                     </Text>
                 </View>
                 
-                {mgmtPercent !== "N/A" && (
                 <View style={[styles.statBox, {marginLeft: 12}]}>
                     <Text style={styles.statLabel}>Avg Mgmt Fee %</Text>
                     <Text style={styles.statValue}>{mgmtPercent}%</Text>
                 </View>
-                )}
             </View>
 
             <View style={{marginTop: 20, height: 180, justifyContent: 'center', alignItems:'center'}}>
@@ -435,12 +445,12 @@ const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
                     />
                 ) : (
                     <Text style={{color: '#444', textAlign: 'center', fontStyle: 'italic'}}>
-                        No data available for graph
+                        No data available
                     </Text>
                 )}
             </View>
 
-            {/* Monthly List (Only show for single year view) */}
+            {/* Monthly List */}
             {isSingleYear && monthlyDetails.length > 0 && (
                 <View style={styles.monthlyListContainer}>
                     <View style={styles.separator} />
@@ -451,7 +461,7 @@ const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
                     
                     {expanded && (
                         <View style={{marginTop: 12}}>
-                            <View style={[styles.historyRowItem, {borderBottomWidth: 0, paddingBottom: 4}]}>
+                             <View style={[styles.historyRowItem, {borderBottomWidth: 0, paddingBottom: 4}]}>
                                 <Text style={[styles.historyDate, {color:'#888', fontSize: 10}]}>MONTH</Text>
                                 <View style={{flexDirection:'row', width: 120, justifyContent:'space-between'}}>
                                     <Text style={{color:'#888', fontSize: 10}}>FEE %</Text>
@@ -459,8 +469,10 @@ const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
                                 </View>
                             </View>
                             {monthlyDetails.map((item: any, idx: number) => {
-                                const monthlyFeePct = item.Account_Value > 0 
-                                    ? ((item.Fees_Paid_This_Month / item.Account_Value) * 100).toFixed(3) 
+                                const feeAmount = item.Fees_Paid_This_Month || 0;
+                                const accVal = item.Account_Value || 0;
+                                const monthlyFeePct = accVal > 0 
+                                    ? ((feeAmount / accVal) * 100).toFixed(3) 
                                     : "0.000";
                                     
                                 return (
@@ -470,8 +482,8 @@ const CommissionsCard = ({ data, showNumbers }: { data: any, showNumbers: boolea
                                         </Text>
                                         <View style={{flexDirection:'row', width: 120, justifyContent:'space-between', alignItems:'center'}}>
                                             <Text style={{color: '#AAA', fontSize: 12}}>{monthlyFeePct}%</Text>
-                                            <Text style={{color: item.Fees_Paid_This_Month > 0 ? '#F87171' : '#666'}}>
-                                                {showNumbers ? `₪${item.Fees_Paid_This_Month.toLocaleString()}` : '****'}
+                                            <Text style={{color: feeAmount > 0 ? '#F87171' : '#666'}}>
+                                                {showNumbers ? `₪${feeAmount.toLocaleString()}` : '****'}
                                             </Text>
                                         </View>
                                     </View>
@@ -525,6 +537,7 @@ const ImprovementTipsCard = ({ summaryData }: { summaryData: any }) => {
     );
 };
 
+// --- HEADER & MAIN ---
 const Header = ({ onOpenSettings }: { onOpenSettings: () => void }) => (
   <View style={styles.header}>
     <View style={styles.headerLeft}>
@@ -545,7 +558,45 @@ const Header = ({ onOpenSettings }: { onOpenSettings: () => void }) => (
 export default function Index() {
   const [showNumbers, setShowNumbers] = useState(false);
   const [settingsVisible, setSettingsVisible] = useState(false);
-  const latestData = getSummaryForRange('1Y', reportData);
+  
+  const [reportData, setReportData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  // --- FETCH DATA FROM FIREBASE ---
+  useEffect(() => {
+    const fetchData = async () => {
+        try {
+            // וודא שה-import של db ו-doc מוגדרים נכון
+            const docRef = doc(db, "portfolio", "latest_report");
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
+                setReportData(docSnap.data());
+            } else {
+                console.log("No document!");
+                // fallback for demo if empty
+                setReportData({ Summary_By_Period: [], Monthly_Data: [] }); 
+            }
+        } catch (e) {
+            console.error("Fetch error:", e);
+        } finally {
+            setLoading(false);
+        }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) {
+      return (
+          <View style={[styles.container, {justifyContent:'center', alignItems:'center'}]}>
+              <ActivityIndicator size="large" color="#4ADE80" />
+          </View>
+      );
+  }
+
+  // Safe check if data exists
+  const safeData = reportData || { Summary_By_Period: [], Monthly_Data: [] };
+  const latestData = getSummaryForRange('1Y', safeData);
 
   return (
     <View style={styles.container}>
@@ -562,12 +613,12 @@ export default function Index() {
       <ScrollView style={styles.content} contentContainerStyle={{paddingBottom: 40}}>
         <View style={styles.grid}>
             <View style={styles.col}>
-                <PerformanceCard data={reportData} showNumbers={showNumbers} />
+                <PerformanceCard data={safeData} showNumbers={showNumbers} />
                 <ImprovementTipsCard summaryData={latestData} />
             </View>
             <View style={styles.col}>
-                <CommissionsCard data={reportData} showNumbers={showNumbers} />
-                <FearGreedCard data={reportData} />
+                <CommissionsCard data={safeData} showNumbers={showNumbers} />
+                <FearGreedCard data={safeData} />
             </View>
         </View>
       </ScrollView>
@@ -613,7 +664,7 @@ const styles = StyleSheet.create({
   miniTfTextActive: { color: '#FFF' },
 
   perfLabel: { color: '#AAA', fontSize: 12, marginBottom: 4 },
-  mainPerfValue: { fontSize: 36, fontWeight: 'bold', marginBottom: 2 },
+  mainPerfValue: { fontSize: 36, fontWeight: 'bold', marginBottom: 12 },
   moneyMadeText: { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   mainStatContainer: { alignItems: 'center', marginBottom: 20 },
   
