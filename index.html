@@ -4,7 +4,6 @@
     <meta charset="utf-8" />
     <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <base href="/MyInvestmentStatus/" />
     <title>myinvestmentstatus</title>
     <!-- The `react-native-web` recommended style reset: https://necolas.github.io/react-native-web/docs/setup/#root-element -->
     <style id="expo-reset">
@@ -33,22 +32,6 @@
     </noscript>
     <!-- The root element for your Expo app. -->
     <div id="root"></div>
-    
-    <!-- Rewrite asset URLs to include /MyInvestmentStatus/ for GitHub Pages subpath -->
-    <script>
-      (function() {
-        const repoBase = '/MyInvestmentStatus';
-        const originalFetch = window.fetch;
-        window.fetch = function(...args) {
-          const url = args[0];
-          if (typeof url === 'string' && url.startsWith('/assets/')) {
-            args[0] = repoBase + url;
-          }
-          return originalFetch.apply(this, args);
-        };
-      })();
-    </script>
-    
-  <script src="/MyInvestmentStatus/_expo/static/js/web/AppEntry-da0b5f3c912509f52bf1a98e17e9b7d3.js" defer></script>
+  <script src="/_expo/static/js/web/AppEntry-da0b5f3c912509f52bf1a98e17e9b7d3.js" defer></script>
 </body>
 </html>
