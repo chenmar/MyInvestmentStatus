@@ -1,39 +1,22 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html>
   <head>
     <meta charset="utf-8" />
-    <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
-    <title>MyInvestmentStatus</title>
-    <style id="expo-reset">
-      html,
-      body {
-        height: 100%;
-      }
-      body {
-        overflow: hidden;
-      }
-      #root {
-        display: flex;
-        height: 100%;
-        flex: 1;
-      }
-    </style>
+    <meta http-equiv="x-ua-compatible" content="ie=edge" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Redirecting…</title>
     <script>
-      // Preserve original path for SPA routing
       (function() {
         var repoBase = '/MyInvestmentStatus';
-        if (!location.hash && location.pathname !== repoBase + '/' && location.pathname !== repoBase + '/index.html') {
-          location.replace(repoBase + '/404.html#' + location.pathname.replace(repoBase, '') + location.search + location.hash);
-        }
+        var indexPath = repoBase + '/index.html';
+        fetch(indexPath).then(function(r){ return r.text(); }).then(function(html){
+          document.open();
+          document.write(html);
+          document.close();
+          history.replaceState({}, '', location.pathname + location.search + location.hash);
+        }).catch(function(){ location.href = repoBase + '/'; });
       })();
     </script>
   </head>
-  <body>
-    <noscript>
-      You need to enable JavaScript to run this app.
-    </noscript>
-    <div id="root"></div>
-    <script src="/MyInvestmentStatus/expo-static/static/js/web/entry-609fec36c1ecd01ba2b9ec0c919e9e7a.js" defer></script>
-  </body>
+  <body></body>
 </html>
