@@ -6,7 +6,8 @@
   "scripts": {
     "start": "expo start",
     "web": "expo start --web",
-    "build": "expo export --platform web",
+    "build": "expo export --platform web && npm run postbuild",
+    "postbuild": "copy index.html dist\\index.html",
     "predeploy": "npm run build",
     "deploy": "npm run predeploy && gh-pages -d dist",
     "test": "jest"
@@ -29,6 +30,7 @@
     "@types/jest": "^29.5.0",
     "@types/react": "^18.2.0",
     "babel-preset-expo": "^10.0.0",
+    "gh-pages": "^6.3.0",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "ts-jest": "^29.1.0",
