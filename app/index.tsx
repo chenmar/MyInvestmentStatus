@@ -36,165 +36,11 @@ const HEBREW_TO_ENGLISH_MONTHS: Record<string, string> = {
 };
 
 const HEBREW_MONTH_ORDER: Record<string, number> = {
-    "ינואר": 1, "פברואר": 2, "מרץ": 3, "אפריל": 4,
-    "מאי": 5, "יוני": 6, "יולי": 7, "אוגוסט": 8,
-    "ספטמבר": 9, "אוקטובר": 10, "נובמבר": 11, "דצמבר": 12
+    "ינואר": 0, "פברואר": 1, "מרץ": 2, "אפריל": 3,
+    "מאי": 4, "יוני": 5, "יולי": 6, "אוגוסט": 7,
+    "ספטמבר": 8, "אוקטובר": 9, "נובמבר": 10, "דצמבר": 11
 };
 
-const HARDCODED_BENCHMARK_RETURNS: Record<string, { spx: number, ndx: number }> = {
-    "2024-1": { spx: 1.6, ndx: 1.9 }, "2024-2": { spx: 5.2, ndx: 5.3 },
-    "2024-3": { spx: 3.1, ndx: 1.2 }, "2024-4": { spx: -4.2, ndx: -4.4 },
-    "2024-5": { spx: 4.8, ndx: 6.2 }, "2024-6": { spx: 3.5, ndx: 6.1 },
-    "2024-7": { spx: 1.1, ndx: -1.6 }, "2024-8": { spx: 2.3, ndx: 1.1 },
-    "2024-9": { spx: 2.0, ndx: 2.5 }, "2024-10": { spx: -1.0, ndx: -0.9 },
-    "2024-11": { spx: 5.7, ndx: 5.5 }, "2024-12": { spx: 2.5, ndx: 2.8 },
-    "2025-1": { spx: 3.2, ndx: 4.1 }, "2025-2": { spx: -1.5, ndx: -2.0 },
-    "2025-3": { spx: 4.0, ndx: 5.5 }, "2025-4": { spx: 2.1, ndx: 3.0 },
-    "2025-5": { spx: -2.8, ndx: -3.5 }, "2025-6": { spx: 5.5, ndx: 6.8 },
-    "2025-7": { spx: 3.2, ndx: 4.0 }, "2025-8": { spx: 1.0, ndx: 0.5 },
-    "2025-9": { spx: -2.0, ndx: -2.5 }, "2025-10": { spx: 3.8, ndx: 4.5 },
-    "2025-11": { spx: 4.2, ndx: 5.1 }, "2025-12": { spx: 2.5, ndx: 3.0 },
-};
-
-// --- DATA PROCESSING ENGINE (RESTORED FROM YOUR SNIPPET) ---
-const processDataForRange = (range: string, rawData: any) => {
-    // 1. Safety Check
-    if (!rawData || !rawData.Monthly_Data || rawData.Monthly_Data.length === 0) {
-        return {
-            Period: "No Data",
-            User_Return: 0,
-            SPX_Return: 0,
-            NDX_Return: 0,
-            Total_Fees_Paid: 0,
-            Management_Fee_Percent: 0,
-            Avg_AUM: 0,
-            FilteredData: [],
-            Fear_Greed_Score: 24,
-            currentBalance: 0
-        };
-    }
-
-    // 2. Sort Data (Oldest -> Newest)
-    let sortedData = [...rawData.Monthly_Data];
-    sortedData.sort((a, b) => {
-        if (a.Year !== b.Year) return a.Year - b.Year;
-        const monthA = HEBREW_MONTH_ORDER[a.Month] || 0;
-        const monthB = HEBREW_MONTH_ORDER[b.Month] || 0;
-        return monthA - monthB;
-    });
-
-    // 3. Determine "Current Year" dynamically
-    const years = sortedData.map(d => d.Year);
-    const maxYear = Math.max(...years);
-
-    // 4. Filter logic
-    let filteredData = [];
-    if (range === '1M') {
-        filteredData = [sortedData[sortedData.length - 1]];
-    } else if (range === 'YTD') {
-        filteredData = sortedData.filter(d => d.Year === maxYear);
-        if (filteredData.length === 0) filteredData = sortedData.filter(d => d.Year === maxYear - 1); // Fallback
-    } else if (range === '1Y') {
-        filteredData = sortedData.slice(-12);
-    } else {
-        filteredData = sortedData;
-    }
-
-    // 5. Calculate Totals
-    let totalReturn = 0;
-    let totalFees = 0;
-    let latestAccountValue = 0;
-    let managementFeePct = 0;
-
-    // Benchmarks totals for comparison text
-    let spxTotal = 0;
-    let ndxTotal = 0;
-
-    if (filteredData.length > 0) {
-        totalFees = filteredData.reduce((acc, curr) => acc + (curr.Fees_Paid_This_Month || 0), 0);
-        
-        // Sum returns for the period (Simple addition for text display)
-        totalReturn = filteredData.reduce((acc, curr) => acc + (curr.User_Monthly_Return || 0), 0);
-        
-        // Sum benchmark returns
-        spxTotal = filteredData.reduce((acc, curr) => {
-            const key = `${curr.Year}-${HEBREW_MONTH_ORDER[curr.Month]}`;
-            const val = curr.SPX_Monthly_Return !== undefined ? curr.SPX_Monthly_Return : (HARDCODED_BENCHMARK_RETURNS[key]?.spx || 0);
-            return acc + val;
-        }, 0);
-
-        ndxTotal = filteredData.reduce((acc, curr) => {
-            const key = `${curr.Year}-${HEBREW_MONTH_ORDER[curr.Month]}`;
-            const val = curr.NDX_Monthly_Return !== undefined ? curr.NDX_Monthly_Return : (HARDCODED_BENCHMARK_RETURNS[key]?.ndx || 0);
-            return acc + val;
-        }, 0);
-
-        // Get latest value
-        const lastItem = filteredData[filteredData.length - 1];
-        latestAccountValue = lastItem.Account_Value || 0;
-        
-        // --- RESTORED LOGIC FOR FEE % ---
-        // Calculate Fee % based on the last month in the selection
-        if (latestAccountValue > 0 && lastItem.Fees_Paid_This_Month) {
-            managementFeePct = parseFloat(((lastItem.Fees_Paid_This_Month / latestAccountValue) * 100).toFixed(3));
-        } else if (filteredData.length > 0) {
-             // Fallback: Average fee ratio over the period
-             const avgFee = totalFees / filteredData.length;
-             const avgBal = filteredData.reduce((a, b) => a + b.Account_Value, 0) / filteredData.length;
-             if(avgBal > 0) managementFeePct = parseFloat(((avgFee / avgBal) * 100).toFixed(3));
-        }
-    }
-
-    return {
-        Period: range === '1M' ? 'Last Month' : (range === 'YTD' ? `${maxYear} YTD` : range),
-        User_Return: parseFloat(totalReturn.toFixed(2)),
-        SPX_Return: parseFloat(spxTotal.toFixed(2)),
-        NDX_Return: parseFloat(ndxTotal.toFixed(2)),
-        Total_Fees_Paid: Math.round(totalFees),
-        Management_Fee_Percent: managementFeePct,
-        currentBalance: latestAccountValue,
-        FilteredData: filteredData,
-        Fear_Greed_Score: 24 
-    };
-};
-
-const calculateStockPerformance = (transactions: any[], range: string) => {
-    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) return { gainers: [], losers: [] };
-    const startDate = getStartDateForRange(range);
-    const stockMap: Record<string, { profit: number, cost: number }> = {};
-
-    transactions.forEach((t: any) => {
-        const tDate = parseHebrewDate(t['תאריך']); // Helper function reused
-        if (tDate >= startDate) {
-            const name = t['שם נייר'];
-            if (['מגן מס', 'מס ששולם', 'מס עתידי', 'מס לשלם', 'העברה', 'הפקדה', 'ריבית', 'דמי ניהול', 'דמי טפול'].some(x => name?.includes(x))) return;
-            
-            // Clean number helper
-            const cleanNum = (val:any) => typeof val === 'string' ? parseFloat(val.replace(/,/g, '')) : (val || 0);
-            const tax = cleanNum(t['אומדן מס רווחי הון']);
-            
-            if (name && tax !== 0) {
-                if (!stockMap[name]) stockMap[name] = { profit: 0, cost: 0 };
-                const estimatedProfit = tax * 4;
-                stockMap[name].profit += estimatedProfit;
-                const saleAmount = cleanNum(t['תמורה בשקלים']);
-                const impliedCost = Math.abs(saleAmount) - estimatedProfit;
-                if (impliedCost > 0) stockMap[name].cost += impliedCost;
-            }
-        }
-    });
-
-    const stocksArray = Object.keys(stockMap).map(key => ({
-        ticker: key, 
-        total_return_ils: stockMap[key].profit, 
-    }));
-
-    const gainers = stocksArray.filter(s => s.total_return_ils > 0).sort((a, b) => b.total_return_ils - a.total_return_ils);
-    const losers = stocksArray.filter(s => s.total_return_ils < 0).sort((a, b) => a.total_return_ils - b.total_return_ils);
-    return { gainers, losers };
-};
-
-// --- HELPER FUNCTIONS ---
 const parseHebrewDate = (dateStr: string) => {
     if (!dateStr || typeof dateStr !== 'string') return new Date(0);
     const parts = dateStr.split('/');
@@ -202,25 +48,227 @@ const parseHebrewDate = (dateStr: string) => {
     return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
 };
 
+const cleanNumber = (val: any) => {
+    if (typeof val === 'number') return val;
+    if (typeof val === 'string') {
+        const cleaned = val.replace(/,/g, '');
+        return parseFloat(cleaned) || 0;
+    }
+    return 0;
+};
+
 const getStartDateForRange = (range: string) => {
     const now = new Date();
     const currentYear = now.getFullYear();
     now.setHours(0,0,0,0);
+
     switch (range) {
-        case '1M': return new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+        case '1M': 
+            let mDate = new Date(now);
+            mDate.setMonth(now.getMonth() - 1);
+            return mDate;
         case 'YTD': return new Date(currentYear, 0, 1);
-        case '1Y': return new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
-        case '5Y': return new Date(now.getFullYear() - 5, now.getMonth(), now.getDate());
-        default: return new Date(2000, 0, 1);
+        case '1Y': 
+            let yDate = new Date(now);
+            yDate.setFullYear(currentYear - 1);
+            return yDate;
+        case '5Y': 
+             let y5Date = new Date(now);
+             y5Date.setFullYear(currentYear - 5);
+             return y5Date;
+        case '10Y': 
+             let y10Date = new Date(now);
+             y10Date.setFullYear(currentYear - 10);
+             return y10Date;
+        case 'Max': default: return new Date(2000, 0, 1);
     }
 };
 
-const fetchFearGreedData = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return 27; // Hardcoded for consistency as requested
+// --- 2. CALCULATION LOGIC ---
+
+// 2.1 Stock Performance
+const calculateStockPerformance = (transactions: any[], range: string) => {
+    if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+        return { gainers: [], losers: [] };
+    }
+    
+    const startDate = range === 'YTD' ? new Date(2024, 0, 1) : getStartDateForRange(range);
+    const stockMap: Record<string, { profit: number, cost: number }> = {};
+
+    transactions.forEach((t: any) => {
+        const tDate = parseHebrewDate(t['תאריך']);
+        if (tDate >= startDate) {
+            const name = t['שם נייר'];
+            if (['מגן מס', 'מס ששולם', 'מס עתידי', 'מס לשלם', 'העברה', 'הפקדה', 'ריבית', 'דמי ניהול', 'דמי טפול'].some(x => name?.includes(x))) return;
+
+            const tax = cleanNumber(t['אומדן מס רווחי הון']);
+            if (name && tax !== 0) {
+                if (!stockMap[name]) stockMap[name] = { profit: 0, cost: 0 };
+                const estimatedProfit = tax * 4;
+                stockMap[name].profit += estimatedProfit;
+                const saleAmount = cleanNumber(t['תמורה בשקלים']);
+                const impliedCost = Math.abs(saleAmount) - estimatedProfit;
+                if (impliedCost > 0) stockMap[name].cost += impliedCost;
+            }
+        }
+    });
+
+    const stocksArray = Object.keys(stockMap).map(key => {
+        const profit = stockMap[key].profit;
+        const cost = stockMap[key].cost;
+        const percent = cost > 0 ? (profit / cost) * 100 : 0;
+        return { ticker: key, total_return_ils: profit, return_pct: percent };
+    });
+
+    const gainers = stocksArray.filter(s => s.total_return_ils > 0).sort((a, b) => b.total_return_ils - a.total_return_ils);
+    const losers = stocksArray.filter(s => s.total_return_ils < 0).sort((a, b) => a.total_return_ils - b.total_return_ils);
+    return { gainers, losers };
 };
 
-// --- COMPONENTS ---
+// 2.2 Graph Data Processing
+const processGraphData = (portfolioData: any, range: string) => {
+    const monthlyData = portfolioData.Monthly_Data || [];
+    const transactions = portfolioData.Transactions || [];
+    
+    // Sort
+    const sortedData = [...monthlyData].sort((a:any, b:any) => {
+        if (a.Year !== b.Year) return a.Year - b.Year;
+        return HEBREW_MONTH_ORDER[a.Month] - HEBREW_MONTH_ORDER[b.Month];
+    });
+
+    // Filter
+    let filteredData = sortedData;
+    if (range === 'YTD') {
+        filteredData = sortedData.filter((d:any) => d.Year === 2025);
+        if(filteredData.length === 0) filteredData = sortedData.filter((d:any) => d.Year === 2024);
+    } else if (range === '1Y') {
+        filteredData = sortedData.slice(-12);
+    } else if (range === '1M') {
+        filteredData = sortedData.slice(-1);
+    }
+
+    if (filteredData.length === 0 && sortedData.length > 0) filteredData = sortedData; 
+
+    // --- Variables ---
+    let currentBalance = 0;
+    let totalCommissions = 0;
+    let totalMgmtFees = 0;
+    let allTimeMgmtFees = 0;
+    let totalRangeProfit = 0;
+    let accumulatedPct = 0; 
+
+    const lineDataUser: any[] = [];
+    const lineDataSPX: any[] = [];
+    const lineDataNDX: any[] = [];
+    const barDataFees: any[] = [];
+    const feeValues: number[] = [];
+
+    // Base value for benchmarks (Start from user's first balance point)
+    const startBalance = filteredData.length > 0 ? cleanNumber(filteredData[0].Account_Value) : 0;
+
+    // --- 1. Process Monthly Data ---
+    filteredData.forEach((d:any, i:number) => {
+        currentBalance = cleanNumber(d.Account_Value);
+        
+        const monthlyReturn = cleanNumber(d.User_Monthly_Return);
+        const returnDecimal = monthlyReturn / 100;
+        const previousValueImplied = currentBalance / (1 + returnDecimal);
+        
+        totalRangeProfit += (currentBalance - previousValueImplied);
+        accumulatedPct += monthlyReturn;
+
+        const fee = cleanNumber(d.Fees_Paid_This_Month);
+        totalCommissions += fee;
+        feeValues.push(fee);
+
+        const monthName = HEBREW_TO_ENGLISH_MONTHS[d.Month] || d.Month;
+        const label = i % 2 === 0 ? monthName : '';
+
+        // --- GRAPH: User Line ---
+        lineDataUser.push({ 
+            value: currentBalance, 
+            label: label, 
+            dataPointText: `${monthlyReturn.toFixed(1)}%` 
+        });
+
+        // --- BENCHMARKS: From Firebase Data ---
+        // Default to 0 if data is missing (e.g., Python script didn't run yet)
+        const spxPct = d.SPX_Monthly_Return ?? 0;
+        const ndxPct = d.NDX_Monthly_Return ?? 0;
+
+        // Compounding Logic
+        const prevSPX = i === 0 ? startBalance : lineDataSPX[i-1].value;
+        const prevNDX = i === 0 ? startBalance : lineDataNDX[i-1].value;
+
+        lineDataSPX.push({ 
+            value: prevSPX * (1 + spxPct/100),
+            dataPointText: `${spxPct.toFixed(1)}%`
+        });
+
+        lineDataNDX.push({ 
+            value: prevNDX * (1 + ndxPct/100),
+            dataPointText: `${ndxPct.toFixed(1)}%`
+        });
+
+        barDataFees.push({ 
+            value: fee, 
+            label: label, 
+            frontColor: '#F87171',
+            topLabelComponent: () => <Text style={{color: '#F87171', fontSize: 10, marginBottom: 2}}>{Math.round(fee)}</Text>
+        });
+    });
+
+    // --- 2. Calculate Management Fees ---
+    // We look at all historical fees to get a valid "Annual Expense Ratio"
+    transactions.forEach((t:any) => {
+        const name = t['שם נייר'] || "";
+        if (name.includes("דמי ניהול") || name.includes("דמי טפול")) {
+             const val = Math.abs(cleanNumber(t['תמורה בשקלים']));
+             if(val > 0) allTimeMgmtFees += val;
+             
+             // Current Range Sum
+             const tDate = parseHebrewDate(t['תאריך']);
+             const startDate = getStartDateForRange(range);
+             if (tDate >= startDate) {
+                 totalMgmtFees += val;
+             }
+        }
+    });
+
+    // FIX: Mgmt Fee Ratio = (Total Historical Fees / Current Balance) * 100
+    // This ensures a non-zero result if you've paid fees in the past
+    const mgmtFeeRatio = currentBalance > 0 ? (allTimeMgmtFees / currentBalance) * 100 : 0;
+
+    // --- Comparison Totals ---
+    const spxTotalGrowth = startBalance > 0 ? ((lineDataSPX[lineDataSPX.length-1]?.value - startBalance) / startBalance) * 100 : 0;
+    const ndxTotalGrowth = startBalance > 0 ? ((lineDataNDX[lineDataNDX.length-1]?.value - startBalance) / startBalance) * 100 : 0;
+    const userTotalGrowth = startBalance > 0 ? ((currentBalance - startBalance) / startBalance) * 100 : 0;
+
+    const maxFee = Math.max(...feeValues, 50);
+    const totalFees = totalCommissions + totalMgmtFees;
+
+    return {
+        userTotalGrowth,
+        spxTotalGrowth,
+        ndxTotalGrowth,
+        currentBalance,
+        totalRangeProfit,
+        totalFees,
+        mgmtFeeRatio, 
+        maxFee, 
+        lineDataUser,
+        lineDataSPX,
+        lineDataNDX,
+        barDataFees
+    };
+};
+
+const fetchFearGreedData = async () => {
+    // Attempt to fetch or simulate
+    return 27; 
+};
+
+// --- 4. COMPONENTS ---
 
 const Header = ({ onOpenSettings }: any) => (
     <View style={styles.header}>
@@ -259,9 +307,9 @@ const MiniTimeFrameSelector = ({ selected, onSelect, options }: any) => (
 
 const PerformanceCard = ({ data, showNumbers }: any) => {
     const [range, setRange] = useState('YTD');
-    const stats = useMemo(() => processDataForRange(range, data), [data, range]);
+    const stats = useMemo(() => processGraphData(data, range), [data, range]);
 
-    if (!stats || stats.FilteredData.length === 0) return (
+    if (!stats || stats.lineDataUser.length === 0) return (
         <View style={styles.card}>
              <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitle}>Performance</Text>
@@ -271,57 +319,21 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
         </View>
     );
 
-    const isPositive = stats.User_Return >= 0;
+    const isPositive = stats.userTotalGrowth >= 0;
     const color = isPositive ? '#4ADE80' : '#F87171';
     
-    // Graph Data Generation
-    const startBalance = stats.FilteredData.length > 0 ? (stats.FilteredData[0].Account_Value || 0) : 0;
-    
-    const lineDataUser = [];
-    const lineDataSPX = [];
-    const lineDataNDX = [];
-
-    stats.FilteredData.forEach((d:any, i:number) => {
-        const monthName = HEBREW_TO_ENGLISH_MONTHS[d.Month] || d.Month;
-        const label = i % 2 === 0 ? monthName : '';
-        
-        // User Line: Actual Account Value (Visual Curve)
-        lineDataUser.push({
-            value: d.Account_Value,
-            label: label,
-            dataPointText: `${d.User_Monthly_Return.toFixed(1)}%` // Label is %
-        });
-
-        // Benchmark Lines: Projected from Start Balance
-        const key = `${d.Year}-${HEBREW_MONTH_ORDER[d.Month]}`;
-        const spxVal = d.SPX_Monthly_Return !== undefined ? d.SPX_Monthly_Return : (HARDCODED_BENCHMARK_RETURNS[key]?.spx || 0);
-        const ndxVal = d.NDX_Monthly_Return !== undefined ? d.NDX_Monthly_Return : (HARDCODED_BENCHMARK_RETURNS[key]?.ndx || 0);
-
-        const prevSPX = i === 0 ? startBalance : lineDataSPX[i-1].value;
-        const prevNDX = i === 0 ? startBalance : lineDataNDX[i-1].value;
-
-        lineDataSPX.push({
-            value: prevSPX * (1 + spxVal/100),
-            dataPointText: `${spxVal.toFixed(1)}%`
-        });
-
-        lineDataNDX.push({
-            value: prevNDX * (1 + ndxVal/100),
-            dataPointText: `${ndxVal.toFixed(1)}%`
-        });
-    });
-
-    const spxDiff = stats.User_Return - stats.SPX_Return;
-    const ndxDiff = stats.User_Return - stats.NDX_Return;
+    // Comparisons
+    const spxDiff = stats.userTotalGrowth - stats.spxTotalGrowth;
+    const ndxDiff = stats.userTotalGrowth - stats.ndxTotalGrowth;
 
     const dataSet = [
         {
-            data: lineDataUser,
+            data: stats.lineDataUser,
             color: color,
             thickness: 3,
             dataPointsColor: color,
-            hideDataPoints: false,
-            textColor: color,
+            hideDataPoints: false, 
+            textColor: color, 
             startFillColor: isPositive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)',
             endFillColor: isPositive ? 'rgba(74, 222, 128, 0.01)' : 'rgba(248, 113, 113, 0.01)',
             areaChart: true,
@@ -329,8 +341,8 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
             dataPointTextColor: color
         },
         {
-            data: lineDataSPX,
-            color: '#94A3B8',
+            data: stats.lineDataSPX,
+            color: '#94A3B8', // Gray
             thickness: 2,
             strokeDashArray: [4,4],
             hideDataPoints: false,
@@ -339,8 +351,8 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
             dataPointTextColor: '#94A3B8'
         },
         {
-            data: lineDataNDX,
-            color: '#F59E0B',
+            data: stats.lineDataNDX,
+            color: '#F59E0B', // Amber
             thickness: 2,
             strokeDashArray: [4,4],
             hideDataPoints: false,
@@ -354,7 +366,11 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
         <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardTitle}>Performance</Text>
-                <MiniTimeFrameSelector selected={range} onSelect={setRange} options={['1M', 'YTD', '1Y', '5Y', 'Max']} />
+                <MiniTimeFrameSelector 
+                    selected={range} 
+                    onSelect={setRange} 
+                    options={['1M', 'YTD', '1Y', '5Y', 'Max']} 
+                />
             </View>
 
             <View style={styles.mainStatContainer}>
@@ -363,14 +379,15 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                     {showNumbers ? `₪${Math.round(stats.currentBalance).toLocaleString()}` : '****'}
                 </Text>
                 <Text style={{color: color, fontSize: 16, marginTop: 4, fontWeight: '600'}}>
-                    {isPositive ? '+' : ''}{stats.User_Return.toFixed(2)}% ({range})
+                    {isPositive ? '+' : ''}{stats.userTotalGrowth.toFixed(2)}% ({range})
                 </Text>
             </View>
             
+            {/* Comparison Text Block */}
             <View style={styles.comparisonContainer}>
                 <View style={styles.comparisonItem}>
                     <Text style={styles.comparisonLabel}>
-                        vs S&P 500 ({stats.SPX_Return > 0 ? '+' : ''}{stats.SPX_Return.toFixed(1)}%)
+                        vs S&P 500 ({stats.spxTotalGrowth > 0 ? '+' : ''}{stats.spxTotalGrowth.toFixed(1)}%)
                     </Text>
                     <Text style={[styles.comparisonValue, { color: spxDiff >= 0 ? '#4ADE80' : '#F87171' }]}>
                         {spxDiff >= 0 ? '+' : ''}{spxDiff.toFixed(2)}%
@@ -379,7 +396,7 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                 <View style={styles.comparisonSeparator} />
                 <View style={styles.comparisonItem}>
                     <Text style={styles.comparisonLabel}>
-                        vs NDX 100 ({stats.NDX_Return > 0 ? '+' : ''}{stats.NDX_Return.toFixed(1)}%)
+                        vs NDX 100 ({stats.ndxTotalGrowth > 0 ? '+' : ''}{stats.ndxTotalGrowth.toFixed(1)}%)
                     </Text>
                     <Text style={[styles.comparisonValue, { color: ndxDiff >= 0 ? '#4ADE80' : '#F87171' }]}>
                         {ndxDiff >= 0 ? '+' : ''}{ndxDiff.toFixed(2)}%
@@ -425,20 +442,9 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
 
 const FeesAndCommissionsCard = ({ data, showNumbers }: any) => {
     const [range, setRange] = useState('YTD');
-    const stats = useMemo(() => processDataForRange(range, data), [data, range]);
+    const stats = useMemo(() => processGraphData(data, range), [data, range]);
 
     if (!stats) return null;
-
-    // Prepare Bar Data
-    const barData = stats.FilteredData.map((m: any) => ({
-        value: m.Fees_Paid_This_Month || 0,
-        label: HEBREW_TO_ENGLISH_MONTHS[m.Month] || m.Month,
-        frontColor: '#F87171',
-        topLabelComponent: () => <Text style={{color: '#F87171', fontSize: 10, marginBottom: 2}}>{Math.round(m.Fees_Paid_This_Month)}</Text>
-    }));
-
-    // Dynamic Max Value for visual scaling
-    const maxFee = Math.max(...barData.map((d:any) => d.value), 50);
 
     return (
         <View style={styles.card}>
@@ -459,20 +465,20 @@ const FeesAndCommissionsCard = ({ data, showNumbers }: any) => {
                 <View style={styles.feeSummaryBox}>
                     <Text style={styles.feeSummaryLabel}>Total Paid</Text>
                     <Text style={[styles.feeSummaryValue, { color: '#F87171' }]}>
-                        {showNumbers ? `₪${Math.round(stats.Total_Fees_Paid).toLocaleString()}` : '****'}
+                        {showNumbers ? `₪${Math.round(stats.totalFees).toLocaleString()}` : '****'}
                     </Text>
                 </View>
                 <View style={styles.feeSummaryBox}>
                     <Text style={styles.feeSummaryLabel}>Est. Mgmt Fee %</Text>
                     <Text style={[styles.feeSummaryValue, { color: 'white' }]}>
-                        {stats.Management_Fee_Percent}%
+                        {stats.mgmtFeeRatio.toFixed(3)}%
                     </Text>
                 </View>
             </View>
 
             <View style={{alignItems: 'center'}}>
                 <BarChart
-                    data={barData}
+                    data={stats.barDataFees}
                     barWidth={20}
                     spacing={20}
                     barBorderRadius={4}
@@ -486,7 +492,7 @@ const FeesAndCommissionsCard = ({ data, showNumbers }: any) => {
                     showValuesOnTop={showNumbers} 
                     yAxisTextStyle={{color: '#666', fontSize: 10}}
                     xAxisLabelTextStyle={{color: '#999', fontSize: 10}}
-                    maxValue={maxFee * 1.5} 
+                    maxValue={stats.maxFee * 1.5} 
                 />
             </View>
         </View>
@@ -515,7 +521,7 @@ const FearGreedCard = ({ score }: any) => {
     let color = "#FACC15";
     let label = "Neutral";
     
-    // Fixed Logic: Correct Text based on Score
+    // Dynamic Text
     if (score <= 25) { color = "#F87171"; label = "Extreme Fear"; }
     else if (score < 45) { color = "#F97316"; label = "Fear"; }
     else if (score < 55) { color = "#FACC15"; label = "Neutral"; }
@@ -571,7 +577,9 @@ const StockList = ({ stocks, title, showNumbers }: any) => {
 
 const GainLossStocksCard = ({ transactions, showNumbers }: any) => {
     const [range, setRange] = useState('YTD'); 
-    const { gainers, losers } = useMemo(() => calculateStockPerformance(transactions, range), [range, transactions]);
+    
+    const safeTransactions = Array.isArray(transactions) ? transactions : [];
+    const { gainers, losers } = useMemo(() => calculateStockPerformance(safeTransactions, range), [range, safeTransactions]);
     return (
         <View style={styles.card}>
             <View style={styles.cardHeaderColumn}>
@@ -582,7 +590,7 @@ const GainLossStocksCard = ({ transactions, showNumbers }: any) => {
                     <MiniTimeFrameSelector selected={range} onSelect={setRange} options={['1M', 'YTD', '1Y', '5Y', '10Y', 'Max']} />
                 </View>
             </View>
-            {transactions && transactions.length > 0 ? (
+            {safeTransactions.length > 0 ? (
                 <>
                     <StockList stocks={gainers} title="Highest Profit" showNumbers={showNumbers} />
                     <View style={styles.separator} />
