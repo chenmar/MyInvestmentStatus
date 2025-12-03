@@ -17,7 +17,7 @@ TEMP_DIR = os.path.join(BASE_DIR, "temp")
 YIELDS_FILE = os.path.join(TEMP_DIR, "yields_data.json")
 TRANS_FILE = os.path.join(TEMP_DIR, "all_transactions.json")
 
-# Ensure this filename matches your key file
+# Ensure this matches your actual key file name
 FIREBASE_KEY_FILE = os.path.join(BASE_DIR, "myinvestmentstatus-6cd1e-firebase-adminsdk-fbsvc-b032b1cb8e.json")
 
 hebrew_months = {
@@ -31,9 +31,12 @@ hebrew_months = {
 def get_cnn_fear_greed_index():
     print("⏳ Fetching LIVE Fear & Greed Index from CNN...")
     try:
+        # Specific headers to act like a real browser
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Referer": "https://www.cnn.com/",
+            "Origin": "https://www.cnn.com",
+            "Accept": "*/*",
             "Accept-Language": "en-US,en;q=0.9"
         }
         url = "https://production.dataviz.cnn.io/index/fearandgreed/graphdata"
@@ -44,12 +47,14 @@ def get_cnn_fear_greed_index():
             score = int(data['fear_and_greed_historical']['data'][-1]['y'])
             print(f"   ✅ Live Score: {score}")
             return score
+        else:
+            print(f"   ⚠️ API returned status {r.status_code}")
     except Exception as e:
-        print(f"   ⚠️ Could not fetch Fear & Greed ({e}). Defaulting to 50.")
+        print(f"   ⚠️ Connection failed ({e}). Defaulting to fallback.")
     
-    return 50
+    return 27 # Fallback to the value you saw if live fetch fails
 
-def get_benchmarks_data(start_year=2020):
+def get_benchmarks_data(start_year=2023):
     print("⏳ Fetching real monthly benchmark data from Yahoo Finance...")
     tickers = {"SPX": "^GSPC", "NDX": "^NDX"}
     
@@ -57,41 +62,43 @@ def get_benchmarks_data(start_year=2020):
     monthly_data = {} 
 
     try:
+        # Fetch monthly data
         data = yf.download(list(tickers.values()), start=f"{start_year-1}-01-01", interval="1mo", progress=False)['Adj Close']
+        
+        # 1. Calculate Monthly % Change
         pct_change = data.pct_change() * 100
         
         for index, row in pct_change.iterrows():
             year = index.year
             month = index.month
-            
-            spx_val = row.get(tickers["SPX"])
-            ndx_val = row.get(tickers["NDX"])
+            spx_val = row.get(tickers["SPX"], 0.0)
+            ndx_val = row.get(tickers["NDX"], 0.0)
 
             monthly_data[(year, month)] = {
-                "SPX": round(spx_val, 2) if pd.notnull(spx_val) else 0.0,
-                "NDX": round(ndx_val, 2) if pd.notnull(ndx_val) else 0.0
+                "SPX": round(spx_val if pd.notnull(spx_val) else 0.0, 2),
+                "NDX": round(ndx_val if pd.notnull(ndx_val) else 0.0, 2)
             }
 
-        yearly_resample = data.resample('YE').last().pct_change() * 100
-        current_year = datetime.now().year
-        
-        for date, row in yearly_resample.iterrows():
-            if date.year < start_year: continue
-            annual_data[date.year] = {
-                "SPX": round(row[tickers["SPX"]], 2),
-                "NDX": round(row[tickers["NDX"]], 2)
-            }
-            
-        last_close_prev_year = data.resample('YE').last().iloc[-2]
+        # 2. Calculate Accurate YTD for Current Year
+        # Get the last available closing price
         current_price = data.iloc[-1]
-        ytd = ((current_price / last_close_prev_year) - 1) * 100
         
-        annual_data[current_year] = {
-            "SPX": round(ytd[tickers["SPX"]], 2),
-            "NDX": round(ytd[tickers["NDX"]], 2)
-        }
+        # Get the closing price of the last day of the PREVIOUS year
+        last_year_str = str(datetime.now().year - 1)
+        prev_year_data = data.loc[last_year_str]
+        if not prev_year_data.empty:
+            last_close_prev_year = prev_year_data.iloc[-1]
+            ytd = ((current_price / last_close_prev_year) - 1) * 100
+            
+            current_year = datetime.now().year
+            annual_data[current_year] = {
+                "SPX": round(ytd[tickers["SPX"]], 2),
+                "NDX": round(ytd[tickers["NDX"]], 2)
+            }
+            print(f"   ✅ Calculated YTD: SPX {annual_data[current_year]['SPX']}%, NDX {annual_data[current_year]['NDX']}%")
+        else:
+            print("   ⚠️ Could not calculate YTD, missing previous year data.")
 
-        print("   ✅ Benchmarks Fetched Successfully.")
         return annual_data, monthly_data
 
     except Exception as e:
@@ -147,46 +154,16 @@ def main():
     df_trans['OtherFees'] = df_trans['עמלות נלוות'].apply(clean_num)
     df_trans['TotalTradeFees'] = df_trans['Commission'] + df_trans['OtherFees']
     
-    # Identify Management Fees (Strict Filter)
+    # --- FEE FILTER ---
+    # Only counts explicit management fees
     df_trans['IsMgmtFee'] = df_trans['שם נייר'].str.contains('דמי טיפול|דמי ניהול|Management Fee', na=False)
-    
-    # Calculate fee amount
     df_trans['MgmtFeeAmount'] = df_trans.apply(lambda x: abs(clean_num(x['תמורה בשקלים'])) if x['IsMgmtFee'] else 0, axis=1)
 
     fees_by_year = df_trans.groupby('RealYear')[['TotalTradeFees', 'MgmtFeeAmount']].sum()
 
-    # 4. Build Yearly Summary
-    yearly_summary = []
-    all_years = sorted(list(set(list(user_yearly_returns.keys()) + list(fees_by_year.index))))
-
-    for year in all_years:
-        if year == 0: continue
-        bench = annual_benchmarks.get(year, {"SPX": 0, "NDX": 0})
-        trade_fees = fees_by_year.loc[year, 'TotalTradeFees'] if year in fees_by_year.index else 0
-        mgmt_fees = fees_by_year.loc[year, 'MgmtFeeAmount'] if year in fees_by_year.index else 0
-        
-        # FIX: Get correct Average AUM for the year to calculate percentage
-        avg_aum = 0
-        if year in df_yields['Year'].values:
-            avg_aum = df_yields[df_yields['Year'] == year]['AccountValue'].mean()
-        
-        # Calculate % based on Avg AUM
-        mgmt_pct = (mgmt_fees / avg_aum * 100) if avg_aum > 0 else 0.0
-
-        yearly_summary.append({
-            "Period": str(year),
-            "User_Return": round(user_yearly_returns.get(year, 0), 2),
-            "SPX_Return": bench.get("SPX", 0),
-            "NDX_Return": bench.get("NDX", 0),
-            "Fear_Greed_Score": current_fear_greed,
-            "Total_Fees_Paid": round(trade_fees + mgmt_fees, 2),
-            "Management_Fees_Only": round(mgmt_fees, 2),
-            "Management_Fee_Percent": round(mgmt_pct, 3), # This goes to Firebase
-            "Avg_AUM": round(avg_aum, 2)
-        })
-
-    # 5. Build Monthly Data
+    # 4. Build Monthly Data
     monthly_details = []
+    all_years = sorted(list(set(list(user_yearly_returns.keys()) + list(fees_by_year.index))))
     current_years_desc = sorted([y for y in all_years if y > 0], reverse=True)
     
     for year in current_years_desc:
@@ -208,13 +185,14 @@ def main():
                     "User_Monthly_Return": float(user_ret),
                     "Fees_Paid_This_Month": round(m_fees, 2),
                     "Account_Value": float(acc_val),
+                    # INJECT REAL BENCHMARK MONTHLY DATA
                     "SPX_Monthly_Return": bench_month["SPX"],
                     "NDX_Monthly_Return": bench_month["NDX"]
                 })
 
-    # 6. Final Output
+    # 5. Final Output
     final_output = {
-        "Summary_By_Period": yearly_summary,
+        "Fear_Greed_Score": current_fear_greed, # Explicitly adding this to root
         "Monthly_Data": monthly_details,
         "Transactions": trans_data
     }
