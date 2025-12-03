@@ -217,7 +217,7 @@ def main():
         
         db = firestore.client()
         print("☁️ Uploading to Firebase...")
-        db.collection('portfolio').document('latest_report').set(final_output)
+        db.collection('portfolio').document('MjoPi7mrlERKoVDCMhzjzuxgN4F2').set(final_output)
         print("✅ Upload Successful!")
         
         # 6. Cleanup

@@ -2,6 +2,15 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 
+import { 
+    getAuth, 
+    createUserWithEmailAndPassword, 
+    signInWithEmailAndPassword, 
+    signOut,
+    onAuthStateChanged,
+    updateProfile // Useful for storing the username
+} from 'firebase/auth';
+
 const firebaseConfig = {
   apiKey: "AIzaSyB8J5V-4Uo-Sem01moJnCLDB0D4DC0KIDc",
   authDomain: "myinvestmentstatus-6cd1e.firebaseapp.com",
@@ -13,3 +22,4 @@ const firebaseConfig = {
 };
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app); // Exporting auth instance

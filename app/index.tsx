@@ -2,6 +2,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     LayoutAnimation,
     Modal,
@@ -11,6 +12,7 @@ import {
     StyleSheet,
     Switch,
     Text,
+    TextInput, // <-- NEW
     TouchableOpacity,
     TouchableWithoutFeedback,
     UIManager,
@@ -20,9 +22,14 @@ import { BarChart, LineChart } from "react-native-gifted-charts";
 import Svg, { Circle, G, Path } from 'react-native-svg';
 
 // Firebase Imports
-import { doc, getDoc } from "firebase/firestore";
-// Ensure this points to your actual config file location
-import { db } from '../firebaseConfig';
+import {
+    createUserWithEmailAndPassword,
+    onAuthStateChanged,
+    signInWithEmailAndPassword
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from "firebase/firestore"; // setDoc for user creation
+// Ensure this points to your actual config file location and exports auth!
+import { auth, db } from '../firebaseConfig'; // <-- UPDATED to import 'auth'
 
 // Android Animation Setup
 if (Platform.OS === 'android') {
@@ -49,6 +56,7 @@ const HEBREW_MONTH_ORDER: Record<string, number> = {
 
 // --- DATA PROCESSING ENGINE (FIXED) ---
 const processDataForRange = (range: string, rawData: any) => {
+    // ... (Your original processDataForRange function - kept the same)
     // 1. Safety Check
     if (!rawData || !rawData.Monthly_Data || rawData.Monthly_Data.length === 0) {
         return {
@@ -128,9 +136,11 @@ const processDataForRange = (range: string, rawData: any) => {
         Fear_Greed_Score: 24 
     };
 };
+// ... (Your other components: SettingsModal, MiniTimeFrameSelector, PerformanceCard, FearGreedGauge, FearGreedCard, CommissionsCard, ImprovementTipsCard)
+// ... (The implementation of these remains unchanged, but they are included below for completeness)
 
 // --- COMPONENT: Settings Modal ---
-const SettingsModal = ({ visible, onClose, showNumbers, onToggleShowNumbers }: any) => {
+const SettingsModal = ({ visible, onClose, showNumbers, onToggleShowNumbers, onLogout }: any) => {
     return (
         <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
             <TouchableWithoutFeedback onPress={onClose}>
@@ -150,6 +160,11 @@ const SettingsModal = ({ visible, onClose, showNumbers, onToggleShowNumbers }: a
                                     value={showNumbers}
                                 />
                             </View>
+                            <View style={styles.separator} />
+                            <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+                                <Text style={styles.logoutText}>Logout</Text>
+                                <MaterialCommunityIcons name="logout" size={20} color="#F87171" />
+                            </TouchableOpacity>
                         </View>
                     </TouchableWithoutFeedback>
                 </View>
@@ -466,7 +481,7 @@ const ImprovementTipsCard = ({ stats }: { stats: any }) => {
     );
 };
 
-// --- HEADER & MAIN ---
+// --- HEADER ---
 const Header = ({ onOpenSettings }: { onOpenSettings: () => void }) => (
     <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -484,46 +499,348 @@ const Header = ({ onOpenSettings }: { onOpenSettings: () => void }) => (
     </View>
 );
 
+// --- LOGIN SCREEN ---
+const LoginScreen = ({ onNavigateToSignup }: { onNavigateToSignup: () => void }) => {
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleLogin = async () => {
+        setError(''); // Clear previous errors
+        
+        if (!email || !password) {
+            setError("Please enter both email and password.");
+            return;
+        }
+        
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            setError("Please enter a valid email address (e.g., user@example.com)");
+            return;
+        }
+        
+        setLoading(true);
+        try {
+            console.log("Attempting login with email:", email);
+            const result = await signInWithEmailAndPassword(auth, email, password);
+            console.log("Login successful! User UID:", result.user.uid);
+            setError('');
+            // User is automatically set by onAuthStateChanged listener in Index component
+        } catch (error: any) {
+            console.error("Login Error:", error);
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+            
+            // User-friendly error messages
+            let errorMessage = error.message;
+            if (error.code === 'auth/user-not-found') {
+                errorMessage = 'No account found with this email. Please sign up first.';
+            } else if (error.code === 'auth/wrong-password') {
+                errorMessage = 'Incorrect password.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Invalid email format. Please check your email.';
+            } else if (error.code === 'auth/configuration-not-found') {
+                errorMessage = 'Firebase Auth is not properly configured. Please contact support.';
+            } else if (error.code === 'auth/too-many-requests') {
+                errorMessage = 'Too many failed login attempts. Please try again later.';
+            }
+            
+            setError(errorMessage);
+            Alert.alert("Login Failed", errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <View style={[styles.container, styles.authContainer]}>
+            <Text style={styles.authTitle}>Welcome Back</Text>
+            <Text style={styles.authSubtitle}>Sign in to view your portfolio</Text>
+
+            {error ? (
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>{error}</Text>
+                </View>
+            ) : null}
+
+            <TextInput
+                style={styles.input}
+                placeholder="Email (used as Username)"
+                placeholderTextColor="#999"
+                value={email}
+                onChangeText={(text) => {
+                    setEmail(text);
+                    setError(''); // Clear error when user starts typing
+                }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={(text) => {
+                    setPassword(text);
+                    setError(''); // Clear error when user starts typing
+                }}
+                secureTextEntry
+            />
+
+            <TouchableOpacity style={styles.authButton} onPress={handleLogin} disabled={loading}>
+                {loading ? (
+                    <ActivityIndicator color="#121212" />
+                ) : (
+                    <Text style={styles.authButtonText}>Login</Text>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ marginTop: 20 }} onPress={onNavigateToSignup}>
+                <Text style={styles.navText}>
+                    Don't have an account? <Text style={{ color: '#4ADE80', fontWeight: 'bold' }}>Sign Up</Text>
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+// --- SIGNUP SCREEN ---
+const SignupScreen = ({ onNavigateToLogin }: { onNavigateToLogin: () => void }) => {
+    // Note: Firebase Auth uses Email and Password. We'll use 'username' as the email.
+    const [username, setUsername] = useState(''); // This will be the email
+    const [password, setPassword] = useState('');
+    const [id, setId] = useState(''); // ID field, maybe a custom reference or just the user's name
+    const [externalUsername, setExternalUsername] = useState('');
+    const [externalPassword, setExternalPassword] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    const handleSignup = async () => {
+        if (!username || !password) {
+            Alert.alert("Error", "Please enter a valid email and password.");
+            return;
+        }
+        
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(username)) {
+            Alert.alert("Error", "Please enter a valid email address (e.g., user@example.com)");
+            return;
+        }
+        
+        // Password validation
+        if (password.length < 6) {
+            Alert.alert("Error", "Password must be at least 6 characters long.");
+            return;
+        }
+
+        setLoading(true);
+        try {
+            console.log("Starting signup for email:", username);
+            
+            // 1. Create User in Firebase Auth
+            const userCredential = await createUserWithEmailAndPassword(auth, username, password);
+            const user = userCredential.user;
+            console.log("Firebase Auth user created:", user.uid);
+
+            // 2. Create User Profile Document in Firestore (under a 'users' collection)
+            // You can use the user's UID (user.uid) as the document ID
+            const userDataToSave = {
+                email: username,
+                custom_id: id || '',
+                external_username: externalUsername || '',
+                // Note: Storing external_password is highly discouraged unless strictly necessary
+                // for a specific service and done securely (e.g., encrypted).
+                // For this example, we'll store it but recommend rethinking this in production.
+                external_password: externalPassword || '', 
+                created_at: new Date().toISOString(),
+            };
+            
+            console.log("Saving user data to Firestore:", userDataToSave);
+            await setDoc(doc(db, "users", user.uid), userDataToSave);
+            console.log("User data saved successfully!");
+            
+            Alert.alert("Success", "Account created successfully! You are now logged in.");
+            // onAuthStateChanged will handle the navigation to the main screen
+        } catch (error: any) {
+            console.error("Signup Error:", error);
+            console.error("Error code:", error.code);
+            console.error("Error message:", error.message);
+            
+            // User-friendly error messages
+            let errorMessage = error.message;
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'This email is already registered. Please log in instead.';
+            } else if (error.code === 'auth/weak-password') {
+                errorMessage = 'Password is too weak. Please use a stronger password.';
+            } else if (error.code === 'auth/invalid-email') {
+                errorMessage = 'Invalid email format. Please check your email.';
+            } else if (error.code === 'auth/configuration-not-found') {
+                errorMessage = 'Firebase Auth is not properly configured. Please check your Firebase setup.';
+            } else if (error.code === 'permission-denied') {
+                errorMessage = 'Permission denied. Please check Firestore security rules.';
+            }
+            
+            Alert.alert("Signup Failed", errorMessage);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <View style={[styles.container, styles.authContainer]}>
+            <Text style={styles.authTitle}>Create Account</Text>
+            <Text style={styles.authSubtitle}>Setup your InvestTrack profile</Text>
+
+            <TextInput
+                style={styles.input}
+                placeholder="Email (Username for Login)"
+                placeholderTextColor="#999"
+                value={username}
+                onChangeText={setUsername}
+                keyboardType="email-address"
+                autoCapitalize="none"
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor="#999"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="Custom ID"
+                placeholderTextColor="#999"
+                value={id}
+                onChangeText={setId}
+                autoCapitalize="none"
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="External Username"
+                placeholderTextColor="#999"
+                value={externalUsername}
+                onChangeText={setExternalUsername}
+                autoCapitalize="none"
+            />
+            <TextInput
+                style={styles.input}
+                placeholder="External Password (Not Recommended)"
+                placeholderTextColor="#999"
+                value={externalPassword}
+                onChangeText={setExternalPassword}
+                secureTextEntry
+            />
+
+            <TouchableOpacity style={styles.authButton} onPress={handleSignup} disabled={loading}>
+                {loading ? (
+                    <ActivityIndicator color="#121212" />
+                ) : (
+                    <Text style={styles.authButtonText}>Sign Up</Text>
+                )}
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ marginTop: 20 }} onPress={onNavigateToLogin}>
+                <Text style={styles.navText}>
+                    Already have an account? <Text style={{ color: '#4ADE80', fontWeight: 'bold' }}>Login</Text>
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+};
+
+// --- MAIN COMPONENT ---
 export default function Index() {
+    const [firebaseUser, setFirebaseUser] = useState<any>(null); // New state for Firebase Auth User
+    const [authLoading, setAuthLoading] = useState(true); // New state for initial auth check
+    const [isSigningUp, setIsSigningUp] = useState(false); // New state to toggle Login/Signup
+
     const [showNumbers, setShowNumbers] = useState(false);
     const [settingsVisible, setSettingsVisible] = useState(false);
     const [reportData, setReportData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [dataLoading, setDataLoading] = useState(false); // Renamed: dataLoading
 
-    // --- FETCH DATA FROM FIREBASE ---
+    // 1. Listen for Auth State Changes
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            setFirebaseUser(user);
+            setAuthLoading(false);
+            // If user logs out, clear data
+            if (!user) {
+                setReportData(null);
+            }
+        });
+        return unsubscribe;
+    }, []);
+
+    // 2. Fetch Data when User is Authenticated
     useEffect(() => {
         const fetchData = async () => {
+            if (!firebaseUser) return; // Only run if a user is logged in
+
+            setDataLoading(true);
             try {
-                // IMPORTANT: Ensure this path matches exactly: collection "portfolio", doc "latest_report"
-                const docRef = doc(db, "portfolio", "latest_report");
+                // IMPORTANT: Use the authenticated user's UID for the document ID
+                const docRef = doc(db, "portfolio", firebaseUser.uid); // <-- UPDATED PATH
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
                     setReportData(docSnap.data());
                 } else {
-                    console.log("DEBUG: Document not found. Check Firestore permissions or ID.");
-                    // Set empty array so app doesn't crash but shows 0
+                    console.log("DEBUG: User-specific document not found.");
+                    Alert.alert("No Data", "No portfolio data found for your account ID.");
                     setReportData({ Monthly_Data: [] });
                 }
             } catch (e) {
                 console.error("DEBUG: Firebase Fetch Error:", e);
+                Alert.alert("Data Error", "Could not fetch portfolio data.");
             } finally {
-                setLoading(false);
+                setDataLoading(false);
             }
         };
         fetchData();
-    }, []);
+    }, [firebaseUser]); // Re-run when the authenticated user changes
 
-    if (loading) {
+    const handleLogout = () => {
+        setSettingsVisible(false);
+        auth.signOut();
+    };
+
+    // --- RENDER LOGIC ---
+
+    if (authLoading) {
         return (
             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator size="large" color="#4ADE80" />
+                <Text style={{color: '#888', marginTop: 10}}>Checking session...</Text>
+            </View>
+        );
+    }
+    
+    // Show Auth Screens if no user is logged in
+    if (!firebaseUser) {
+        if (isSigningUp) {
+            return <SignupScreen onNavigateToLogin={() => setIsSigningUp(false)} />;
+        } else {
+            return <LoginScreen onNavigateToSignup={() => setIsSigningUp(true)} />;
+        }
+    }
+
+    // Show Loading Screen while fetching user-specific data
+    if (dataLoading && !reportData) {
+         return (
+            <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color="#4ADE80" />
+                <Text style={{color: '#888', marginTop: 10}}>Loading portfolio...</Text>
             </View>
         );
     }
 
+    // Main App Screen
     const safeData = reportData || { Monthly_Data: [] };
-    // Pass 'YTD' stats for the tips card
     const ytdStats = processDataForRange('YTD', safeData);
 
     return (
@@ -536,17 +853,18 @@ export default function Index() {
                 onClose={() => setSettingsVisible(false)}
                 showNumbers={showNumbers}
                 onToggleShowNumbers={setShowNumbers}
+                onLogout={handleLogout} // <-- NEW PROP
             />
 
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 40 }}>
-                {/* DEBUGGING TEXT - If this shows empty array [], the fetch failed */}
+                {/* Data Warning */}
                 {(!safeData.Monthly_Data || safeData.Monthly_Data.length === 0) && (
                      <View style={{backgroundColor: '#333', padding: 10, borderRadius: 8, marginBottom: 10}}>
-                        <Text style={{color: 'orange', textAlign: 'center'}}>
-                            No Data Found. Check Console Logs.
-                        </Text>
+                         <Text style={{color: 'orange', textAlign: 'center'}}>
+                            No Portfolio Data Found for this User ID: {firebaseUser.uid}.
+                         </Text>
                      </View>
-                )}
+                 )}
 
                 <View style={styles.grid}>
                     <View style={styles.col}>
@@ -646,4 +964,51 @@ const styles = StyleSheet.create({
     settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     settingLabel: { color: 'white', fontSize: 16 },
     settingDesc: { color: '#888', fontSize: 12, marginTop: 2 },
+    logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
+    logoutText: { color: '#F87171', fontSize: 16, fontWeight: 'bold' },
+    
+    // Auth Styles <-- NEW STYLES
+    authContainer: { justifyContent: 'center', paddingHorizontal: 40, paddingTop: 0 },
+    authTitle: { color: 'white', fontSize: 28, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
+    authSubtitle: { color: '#888', fontSize: 14, marginBottom: 30, textAlign: 'center' },
+    input: {
+        backgroundColor: '#1F2937',
+        color: 'white',
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        paddingVertical: 12,
+        marginBottom: 15,
+        fontSize: 16,
+        borderWidth: 1,
+        borderColor: '#374151',
+    },
+    authButton: {
+        backgroundColor: '#4ADE80',
+        borderRadius: 8,
+        padding: 15,
+        alignItems: 'center',
+        marginTop: 10,
+    },
+    authButtonText: {
+        color: '#121212',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    errorContainer: {
+        backgroundColor: 'rgba(248, 113, 113, 0.2)',
+        borderWidth: 1,
+        borderColor: '#F87171',
+        borderRadius: 8,
+        padding: 12,
+        marginBottom: 20,
+    },
+    errorText: {
+        color: '#F87171',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    navText: {
+        color: '#AAA',
+        textAlign: 'center',
+    },
 });
