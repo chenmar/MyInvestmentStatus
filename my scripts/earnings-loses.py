@@ -261,5 +261,6 @@ except Exception as main_e:
     logging.error(main_e)
 
 finally:
-    input("Press Enter to close...")
-    driver.quit()
+    # input("Press Enter to close...") <-- DELETE OR COMMENT THIS OUT
+    if 'driver' in locals():
+        driver.quit()

@@ -269,5 +269,6 @@ except Exception as main_e:
 
 finally:
     print("✔ Script finished.")
-    input("Press Enter to exit...")
-    driver.quit()
+    # input("Press Enter to exit...")  <-- DELETE OR COMMENT THIS OUT
+    if 'driver' in locals():
+        driver.quit()
