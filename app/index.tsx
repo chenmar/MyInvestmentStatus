@@ -48,7 +48,7 @@ const processDataForRange = (range: string, rawData: any) => {
         return {
             Period: "No Data",
             User_Return: 0,
-            User_Profit_Abs: 0, // Added absolute profit
+            User_Profit_Abs: 0,
             SPX_Return: 0,
             NDX_Return: 0,
             Total_Fees_Paid: 0,
@@ -113,8 +113,7 @@ const processDataForRange = (range: string, rawData: any) => {
 
     const userTotalReturn = (userCompound - 1) * 100;
     
-    // Calculate Absolute Profit: Current Balance - (Current Balance / (1 + Return%))
-    // This gives the amount gained/lost to result in the current balance based on the return.
+    // Calculate Absolute Profit
     let userProfitAbs = 0;
     if (latestAccountValue > 0) {
         const startValue = latestAccountValue / userCompound;
@@ -124,7 +123,7 @@ const processDataForRange = (range: string, rawData: any) => {
     return {
         Period: range === '1M' ? 'Last Month' : (range === 'YTD' ? `${maxYear} YTD` : range),
         User_Return: parseFloat(userTotalReturn.toFixed(2)),
-        User_Profit_Abs: Math.round(userProfitAbs), // Round for display
+        User_Profit_Abs: Math.round(userProfitAbs),
         SPX_Return: 0, 
         NDX_Return: 0,
         Total_Fees_Paid: Math.round(totalFees),
@@ -180,7 +179,6 @@ const calculateStockPerformance = (transactions: any[], range: string) => {
 // --- REAL FEAR & GREED FETCH ---
 const fetchFearGreedData = async () => {
     try {
-        // Using CNN's endpoint via proxy
         const targetUrl = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
         const url = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
         
@@ -188,11 +186,10 @@ const fetchFearGreedData = async () => {
         if (!response.ok) throw new Error("Network response was not ok");
         
         const data = await response.json();
-        // CNN data structure: { fear_and_greed: { score: 45, rating: "Neutral", ... } }
         if (data && data.fear_and_greed && data.fear_and_greed.score) {
             return Math.round(data.fear_and_greed.score);
         }
-        return 50; // Default fallback
+        return 50;
     } catch (e) {
         console.warn("Fear & Greed fetch failed, using fallback", e);
         return 50;
@@ -251,7 +248,6 @@ const fetchMarketHistory = async (symbol: string, range: string) => {
 
     const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${apiRange}&interval=${apiInterval}`;
     
-    // Proxy Strategy: Try corsproxy.io first, then fall back to allorigins.win
     const proxies = [
         `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
         `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`
@@ -259,13 +255,8 @@ const fetchMarketHistory = async (symbol: string, range: string) => {
 
     for (const url of proxies) {
         try {
-            console.log(`Fetching ${symbol} from: ${url}`);
             const response = await fetch(url);
-            
-            if (!response.ok) {
-                console.warn(`Fetch failed for ${url} with status: ${response.status}`);
-                continue; 
-            }
+            if (!response.ok) continue; 
 
             let json;
             if (url.includes('allorigins')) {
@@ -282,13 +273,10 @@ const fetchMarketHistory = async (symbol: string, range: string) => {
             const timestamps = result.timestamp;
             const regularMarketPrice = result.meta.regularMarketPrice;
 
-            // Map to cleaner objects
             const cleanData = timestamps.map((t: number, i: number) => {
                 const close = quotes[i];
                 const prevClose = i > 0 ? quotes[i-1] : close;
                 
-                // Calculate Discrete Monthly Return: (Close - PrevClose) / PrevClose
-                // This is safer than (Close - Open) because Open is often missing in API responses.
                 let monthlyReturn = 0;
                 if (prevClose && close) {
                     monthlyReturn = ((close - prevClose) / prevClose) * 100;
@@ -301,20 +289,16 @@ const fetchMarketHistory = async (symbol: string, range: string) => {
                 };
             }).filter((item: any) => item.value != null);
 
-            // Calculate Cumulative Return for the Header Text
             const startPrice = cleanData.length > 0 ? cleanData[0].value : 0;
             const currentPrice = regularMarketPrice || (cleanData.length > 0 ? cleanData[cleanData.length - 1].value : 0);
             const totalReturn = startPrice > 0 ? ((currentPrice - startPrice) / startPrice) * 100 : 0;
 
-            console.log(`Success ${symbol}: ${totalReturn.toFixed(2)}%`);
             return { currentPrice, totalReturn, history: cleanData };
 
         } catch (error) {
             console.warn(`Proxy failed for ${symbol}:`, error);
         }
     }
-    
-    console.error(`All proxies failed for ${symbol}`);
     return null;
 };
 
@@ -360,16 +344,12 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
     const isPositive = stats.User_Return >= 0;
     const userColor = isPositive ? '#4ADE80' : '#F87171';
     
-    // --- DETERMINE BENCHMARK VALUES (Live vs DB) ---
     const spxReturn = marketData?.spx?.totalReturn ?? 0;
     const ndxReturn = marketData?.ndx?.totalReturn ?? 0;
-
     const spxDiff = stats.User_Return - spxReturn;
     const ndxDiff = stats.User_Return - ndxReturn;
 
     // --- GRAPH DATA GENERATION ---
-
-    // 1. Prepare User Line (Discrete Monthly Return)
     const lineDataUser = stats.FilteredData.map((d: any, i: number) => {
         const val = d.User_Monthly_Return || 0;
         return {
@@ -382,13 +362,11 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
         };
     });
 
-    // Helper: Find matching month in market history
     const findMarketValueForMonth = (history: any[], year: number, hebrewMonth: string) => {
         if (!history || history.length === 0) return 0;
-        const monthIndex = HEBREW_MONTH_ORDER[hebrewMonth]; // 1-12
+        const monthIndex = HEBREW_MONTH_ORDER[hebrewMonth]; 
         if (!monthIndex) return 0;
 
-        // Looser matching: Match Year AND Month index
         const match = history.find(h => 
             h.date.getFullYear() === year && 
             h.date.getMonth() === (monthIndex - 1)
@@ -396,23 +374,16 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
         return match ? match.monthlyReturn : 0;
     };
 
-    // 2. Prepare S&P 500 Line (Use Live Data if available, else DB)
     const lineDataSPX = stats.FilteredData.map((d: any) => {
-        // Try to get from live fetched history first
         let val = 0;
         if (marketData?.spx?.history) {
             val = findMarketValueForMonth(marketData.spx.history, d.Year, d.Month);
         } else {
-            // Fallback to DB if live data not ready/failed
             val = d.SPX_Monthly_Return || 0;
         }
-        return {
-            value: val,
-            formattedValue: `SPX: ${val.toFixed(2)}%`
-        };
+        return { value: val, formattedValue: `SPX: ${val.toFixed(2)}%` };
     });
 
-    // 3. Prepare Nasdaq Line (Use Live Data if available, else DB)
     const lineDataNDX = stats.FilteredData.map((d: any) => {
         let val = 0;
         if (marketData?.ndx?.history) {
@@ -420,10 +391,7 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
         } else {
             val = d.NDX_Monthly_Return || 0;
         }
-        return {
-            value: val,
-            formattedValue: `NDX: ${val.toFixed(2)}%`
-        };
+        return { value: val, formattedValue: `NDX: ${val.toFixed(2)}%` };
     });
 
     const dataSet = [
@@ -456,6 +424,14 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
         }
     ];
 
+    // Dynamic Width and Spacing to fit screen
+    // Card padding is 32 total (16*2). We leave a little buffer (40).
+    const graphWidth = SCREEN_WIDTH - 40;
+    // Calculate spacing so all points fit: Width / (Number of points + 1 for padding)
+    // If data is small, ensure minimum spacing.
+    const numPoints = stats.FilteredData.length;
+    const calculatedSpacing = numPoints > 1 ? (graphWidth - 40) / (numPoints - 1) : 50;
+
     return (
         <View style={styles.card}>
             <View style={styles.cardHeaderRow}>
@@ -472,7 +448,6 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                 <Text style={{color: 'white', fontSize: 32, fontWeight: 'bold'}}>
                     {showNumbers ? `₪${Math.round(stats.currentBalance).toLocaleString()}` : '****'}
                 </Text>
-                {/* --- PROFIT DISPLAY UPDATED --- */}
                 <View style={{flexDirection:'row', alignItems:'center'}}>
                     <Text style={{color: userColor, fontSize: 16, marginTop: 4, fontWeight: '600'}}>
                         {isPositive ? '+' : ''}{stats.User_Return.toFixed(2)}% ({range}) 
@@ -524,9 +499,9 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                 <LineChart
                     dataSet={dataSet}
                     height={180}
-                    width={SCREEN_WIDTH - 60}
-                    spacing={50}
-                    initialSpacing={20}
+                    width={graphWidth}
+                    spacing={calculatedSpacing}
+                    initialSpacing={10}
                     thickness={3}
                     curved
                     
@@ -550,7 +525,7 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                                 borderRadius: 6,
                                 borderWidth: 1,
                                 borderColor: '#374151',
-                                minWidth: 120, // Increased width
+                                minWidth: 160, // Increased width for tooltip
                                 alignItems: 'center'
                             }}>
                                 <Text style={{color: 'white', fontSize: 11, fontWeight: 'bold', marginBottom: 4}}>
@@ -868,13 +843,18 @@ export default function Index() {
             <Header onOpenSettings={() => setSettingsVisible(true)} />
             
             <ScrollView contentContainerStyle={styles.scrollContent}>
+                {/* MOVED PerformanceCard HERE so it takes 100% width */}
+                <View style={{ width: '100%', marginBottom: 16 }}>
+                    <PerformanceCard data={portfolioData} showNumbers={showNumbers} />
+                </View>
+
                 <View style={styles.colContainer}>
                     <View style={styles.grid}>
-                        <View style={styles.col}>
-                            <PerformanceCard data={portfolioData} showNumbers={showNumbers} />
-                        </View>
+                        {/* These remain side-by-side if possible */}
                         <View style={styles.col}>
                             <FeesAndCommissionsCard data={portfolioData} showNumbers={showNumbers} />
+                        </View>
+                        <View style={styles.col}>
                             <FearGreedCard score={fearGreedScore} /> 
                         </View>
                     </View>
@@ -992,7 +972,7 @@ const styles = StyleSheet.create({
 
     comparisonContainer: { flexDirection: 'row', backgroundColor: '#1E293B', borderRadius: 8, padding: 12, marginBottom: 16, alignItems: 'center' },
     comparisonItem: { flex: 1, alignItems: 'center' },
-    comparisonLabel: { color: '#94A3B8', fontSize: 11, marginBottom: 4 }, // Fixed typo: 11f -> 11
+    comparisonLabel: { color: '#94A3B8', fontSize: 11, marginBottom: 4 },
     comparisonValue: { fontSize: 16, fontWeight: 'bold' },
     comparisonSeparator: { width: 1, height: 30, backgroundColor: '#334155', marginHorizontal: 8 },
     
