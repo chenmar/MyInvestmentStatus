@@ -48,6 +48,7 @@ const processDataForRange = (range: string, rawData: any) => {
         return {
             Period: "No Data",
             User_Return: 0,
+            User_Profit_Abs: 0, // Added absolute profit
             SPX_Return: 0,
             NDX_Return: 0,
             Total_Fees_Paid: 0,
@@ -111,18 +112,26 @@ const processDataForRange = (range: string, rawData: any) => {
     }
 
     const userTotalReturn = (userCompound - 1) * 100;
+    
+    // Calculate Absolute Profit: Current Balance - (Current Balance / (1 + Return%))
+    // This gives the amount gained/lost to result in the current balance based on the return.
+    let userProfitAbs = 0;
+    if (latestAccountValue > 0) {
+        const startValue = latestAccountValue / userCompound;
+        userProfitAbs = latestAccountValue - startValue;
+    }
 
     return {
         Period: range === '1M' ? 'Last Month' : (range === 'YTD' ? `${maxYear} YTD` : range),
         User_Return: parseFloat(userTotalReturn.toFixed(2)),
-        // Fallback values from DB if available, otherwise 0
+        User_Profit_Abs: Math.round(userProfitAbs), // Round for display
         SPX_Return: 0, 
         NDX_Return: 0,
         Total_Fees_Paid: Math.round(totalFees),
         Management_Fee_Percent: managementFeePct,
         currentBalance: latestAccountValue,
         FilteredData: filteredData, 
-        Fear_Greed_Score: rawData?.Fear_Greed_Score || 27 
+        Fear_Greed_Score: rawData?.Fear_Greed_Score || 0 
     };
 };
 
@@ -168,9 +177,26 @@ const calculateStockPerformance = (transactions: any[], range: string) => {
     return { gainers, losers };
 };
 
+// --- REAL FEAR & GREED FETCH ---
 const fetchFearGreedData = async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return 27; 
+    try {
+        // Using CNN's endpoint via proxy
+        const targetUrl = 'https://production.dataviz.cnn.io/index/fearandgreed/graphdata';
+        const url = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Network response was not ok");
+        
+        const data = await response.json();
+        // CNN data structure: { fear_and_greed: { score: 45, rating: "Neutral", ... } }
+        if (data && data.fear_and_greed && data.fear_and_greed.score) {
+            return Math.round(data.fear_and_greed.score);
+        }
+        return 50; // Default fallback
+    } catch (e) {
+        console.warn("Fear & Greed fetch failed, using fallback", e);
+        return 50;
+    }
 };
 
 // --- COMPONENTS ---
@@ -446,9 +472,17 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                 <Text style={{color: 'white', fontSize: 32, fontWeight: 'bold'}}>
                     {showNumbers ? `₪${Math.round(stats.currentBalance).toLocaleString()}` : '****'}
                 </Text>
-                <Text style={{color: userColor, fontSize: 16, marginTop: 4, fontWeight: '600'}}>
-                    {isPositive ? '+' : ''}{stats.User_Return.toFixed(2)}% ({range})
-                </Text>
+                {/* --- PROFIT DISPLAY UPDATED --- */}
+                <View style={{flexDirection:'row', alignItems:'center'}}>
+                    <Text style={{color: userColor, fontSize: 16, marginTop: 4, fontWeight: '600'}}>
+                        {isPositive ? '+' : ''}{stats.User_Return.toFixed(2)}% ({range}) 
+                    </Text>
+                    {showNumbers && (
+                        <Text style={{color: userColor, fontSize: 16, marginTop: 4, marginLeft: 8, fontWeight: '600'}}>
+                            {stats.User_Profit_Abs >= 0 ? '+' : '-'}₪{Math.abs(stats.User_Profit_Abs).toLocaleString()}
+                        </Text>
+                    )}
+                </View>
             </View>
             
             <View style={styles.comparisonContainer}>
@@ -512,17 +546,18 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                         pointerLabelComponent: items => (
                             <View style={{
                                 backgroundColor: '#1F2937', 
-                                padding: 6, 
-                                borderRadius: 4,
+                                padding: 8, 
+                                borderRadius: 6,
                                 borderWidth: 1,
                                 borderColor: '#374151',
-                                minWidth: 80
+                                minWidth: 120, // Increased width
+                                alignItems: 'center'
                             }}>
-                                <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold', marginBottom: 2}}>
+                                <Text style={{color: 'white', fontSize: 11, fontWeight: 'bold', marginBottom: 4}}>
                                     {items[0]?.formattedValue}
                                 </Text>
-                                {items[1] && <Text style={{color: '#94A3B8', fontSize: 9}}>{items[1].formattedValue}</Text>}
-                                {items[2] && <Text style={{color: '#F59E0B', fontSize: 9}}>{items[2].formattedValue}</Text>}
+                                {items[1] && <Text style={{color: '#94A3B8', fontSize: 10}}>{items[1].formattedValue}</Text>}
+                                {items[2] && <Text style={{color: '#F59E0B', fontSize: 10}}>{items[2].formattedValue}</Text>}
                             </View>
                         ),
                         radius: 6,
