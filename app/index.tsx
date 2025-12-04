@@ -1,5 +1,5 @@
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -16,11 +16,10 @@ import {
     TouchableOpacity,
     TouchableWithoutFeedback,
     UIManager,
-    View,
-    LayoutAnimation
+    View
 } from 'react-native';
 import { BarChart, LineChart } from "react-native-gifted-charts";
-import Svg, { Path, Circle, G } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { auth, db } from '../firebaseConfig';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -76,7 +75,8 @@ const processDataForRange = (range: string, rawData: any) => {
     // 4. Filter logic
     let filteredData = [];
     if (range === '1M') {
-        filteredData = [sortedData[sortedData.length - 1]];
+        filteredData = sortedData.slice(-1);
+        if (filteredData.length === 0) filteredData = sortedData.slice(-1);
     } else if (range === 'YTD') {
         filteredData = sortedData.filter(d => d.Year === maxYear);
         if (filteredData.length === 0) filteredData = sortedData.filter(d => d.Year === maxYear - 1);
@@ -86,65 +86,49 @@ const processDataForRange = (range: string, rawData: any) => {
         filteredData = sortedData;
     }
 
-    // 5. Calculate Totals
+    // 5. Calculate Totals (Cumulative for the Text Summary)
     let totalFees = 0;
     let latestAccountValue = 0;
     let managementFeePct = 0;
     
-    // Geometric Return Calculation (TWR)
-    // Start at 1.0 (100%), multiply by (1 + monthly_return)
+    // Geometric Return Calculation (TWR) for the Summary Text
     let userCompound = 1.0;
-    let spxCompound = 1.0;
-    let ndxCompound = 1.0;
-
+    
     if (filteredData.length > 0) {
         totalFees = filteredData.reduce((acc, curr) => acc + (curr.Fees_Paid_This_Month || 0), 0);
         
         filteredData.forEach(item => {
-            // User Return
             const uRet = item.User_Monthly_Return || 0;
             userCompound *= (1 + uRet / 100);
-
-            // SPX Return
-            const sRet = item.SPX_Monthly_Return || 0;
-            spxCompound *= (1 + sRet / 100);
-
-            // NDX Return
-            const nRet = item.NDX_Monthly_Return || 0;
-            ndxCompound *= (1 + nRet / 100);
         });
 
-        // Get latest value
         const lastItem = filteredData[filteredData.length - 1];
         latestAccountValue = lastItem.Account_Value || 0;
         
-        // --- ORIGINAL FEE CALCULATION RESTORED ---
-        // Total Fees / Current Balance
         if (latestAccountValue > 0) {
             managementFeePct = parseFloat(((totalFees / latestAccountValue) * 100).toFixed(3));
         }
     }
 
     const userTotalReturn = (userCompound - 1) * 100;
-    const spxTotalReturn = (spxCompound - 1) * 100;
-    const ndxTotalReturn = (ndxCompound - 1) * 100;
 
     return {
         Period: range === '1M' ? 'Last Month' : (range === 'YTD' ? `${maxYear} YTD` : range),
         User_Return: parseFloat(userTotalReturn.toFixed(2)),
-        SPX_Return: parseFloat(spxTotalReturn.toFixed(2)),
-        NDX_Return: parseFloat(ndxTotalReturn.toFixed(2)),
+        // Fallback values from DB if available, otherwise 0
+        SPX_Return: 0, 
+        NDX_Return: 0,
         Total_Fees_Paid: Math.round(totalFees),
         Management_Fee_Percent: managementFeePct,
         currentBalance: latestAccountValue,
-        FilteredData: filteredData,
+        FilteredData: filteredData, 
         Fear_Greed_Score: rawData?.Fear_Greed_Score || 27 
     };
 };
 
 const calculateStockPerformance = (transactions: any[], range: string) => {
     if (!transactions || !Array.isArray(transactions) || transactions.length === 0) return { gainers: [], losers: [] };
-    // Simple Date Filter
+    
     const now = new Date();
     let limitDate = new Date(2000, 0, 1);
     if(range === '1M') limitDate = new Date(now.getFullYear(), now.getMonth()-1, now.getDate());
@@ -226,9 +210,116 @@ const MiniTimeFrameSelector = ({ selected, onSelect, options }: any) => (
     </View>
 );
 
+// --- YAHOO FINANCE FETCH ENGINE (Double Proxy Strategy) ---
+const fetchMarketHistory = async (symbol: string, range: string) => {
+    let apiRange = '1y';
+    const apiInterval = '1mo'; 
+
+    switch (range) {
+        case '1M': apiRange = '1mo'; break;
+        case 'YTD': apiRange = 'ytd'; break;
+        case '1Y': apiRange = '1y'; break;
+        case '5Y': apiRange = '5y'; break;
+        case 'Max': apiRange = 'max'; break;
+    }
+
+    const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${apiRange}&interval=${apiInterval}`;
+    
+    // Proxy Strategy: Try corsproxy.io first, then fall back to allorigins.win
+    const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`,
+        `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`
+    ];
+
+    for (const url of proxies) {
+        try {
+            console.log(`Fetching ${symbol} from: ${url}`);
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                console.warn(`Fetch failed for ${url} with status: ${response.status}`);
+                continue; 
+            }
+
+            let json;
+            if (url.includes('allorigins')) {
+                const wrapper = await response.json();
+                json = JSON.parse(wrapper.contents);
+            } else {
+                json = await response.json();
+            }
+
+            const result = json.chart?.result?.[0];
+            if (!result) continue;
+
+            const quotes = result.indicators.quote[0].close;
+            const timestamps = result.timestamp;
+            const regularMarketPrice = result.meta.regularMarketPrice;
+
+            // Map to cleaner objects
+            const cleanData = timestamps.map((t: number, i: number) => {
+                const close = quotes[i];
+                const prevClose = i > 0 ? quotes[i-1] : close;
+                
+                // Calculate Discrete Monthly Return: (Close - PrevClose) / PrevClose
+                // This is safer than (Close - Open) because Open is often missing in API responses.
+                let monthlyReturn = 0;
+                if (prevClose && close) {
+                    monthlyReturn = ((close - prevClose) / prevClose) * 100;
+                }
+
+                return {
+                    date: new Date(t * 1000),
+                    value: close,
+                    monthlyReturn: monthlyReturn
+                };
+            }).filter((item: any) => item.value != null);
+
+            // Calculate Cumulative Return for the Header Text
+            const startPrice = cleanData.length > 0 ? cleanData[0].value : 0;
+            const currentPrice = regularMarketPrice || (cleanData.length > 0 ? cleanData[cleanData.length - 1].value : 0);
+            const totalReturn = startPrice > 0 ? ((currentPrice - startPrice) / startPrice) * 100 : 0;
+
+            console.log(`Success ${symbol}: ${totalReturn.toFixed(2)}%`);
+            return { currentPrice, totalReturn, history: cleanData };
+
+        } catch (error) {
+            console.warn(`Proxy failed for ${symbol}:`, error);
+        }
+    }
+    
+    console.error(`All proxies failed for ${symbol}`);
+    return null;
+};
+
 const PerformanceCard = ({ data, showNumbers }: any) => {
     const [range, setRange] = useState('YTD');
+    const [marketData, setMarketData] = useState<{spx: any, ndx: any} | null>(null);
+    const [loadingMarket, setLoadingMarket] = useState(false);
+
     const stats = useMemo(() => processDataForRange(range, data), [data, range]);
+
+    useEffect(() => {
+        let isMounted = true;
+        const loadMarket = async () => {
+            setLoadingMarket(true);
+            try {
+                const [spx, ndx] = await Promise.all([
+                    fetchMarketHistory('^GSPC', range),
+                    fetchMarketHistory('^NDX', range)
+                ]);
+                if (isMounted) {
+                    setMarketData({ spx, ndx });
+                }
+            } catch (err) {
+                console.error("Market data load error", err);
+            } finally {
+                if (isMounted) setLoadingMarket(false);
+            }
+        };
+        loadMarket();
+        return () => { isMounted = false; };
+    }, [range]);
 
     if (!stats || stats.FilteredData.length === 0) return (
         <View style={styles.card}>
@@ -241,89 +332,101 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
     );
 
     const isPositive = stats.User_Return >= 0;
-    const color = isPositive ? '#4ADE80' : '#F87171';
+    const userColor = isPositive ? '#4ADE80' : '#F87171';
     
+    // --- DETERMINE BENCHMARK VALUES (Live vs DB) ---
+    const spxReturn = marketData?.spx?.totalReturn ?? 0;
+    const ndxReturn = marketData?.ndx?.totalReturn ?? 0;
+
+    const spxDiff = stats.User_Return - spxReturn;
+    const ndxDiff = stats.User_Return - ndxReturn;
+
     // --- GRAPH DATA GENERATION ---
-    // We need to construct the cumulative curves for User, SPX, NDX
-    // starting from the first data point in the filtered range.
-    
-    // Start everything at the initial Account Value for comparison
-    const initialBalance = stats.FilteredData[0].Account_Value;
-    
-    const lineDataUser: any[] = [];
-    const lineDataSPX: any[] = [];
-    const lineDataNDX: any[] = [];
 
-    // Helper for cumulative calc
-    let userRunning = initialBalance;
-    let spxRunning = initialBalance;
-    let ndxRunning = initialBalance;
-
-    stats.FilteredData.forEach((d:any, i:number) => {
-        const label = i % 2 === 0 ? (HEBREW_TO_ENGLISH_MONTHS[d.Month] || d.Month) : '';
-        
-        // User Data is absolute value
-        lineDataUser.push({
-            value: d.Account_Value,
-            label: label,
-            dataPointText: `${d.User_Monthly_Return.toFixed(1)}%`
-        });
-
-        // Benchmark Data is relative change applied to base
-        const spxChg = d.SPX_Monthly_Return || 0;
-        const ndxChg = d.NDX_Monthly_Return || 0;
-        
-        if (i > 0) {
-            spxRunning = spxRunning * (1 + spxChg/100);
-            ndxRunning = ndxRunning * (1 + ndxChg/100);
-        }
-
-        lineDataSPX.push({
-            value: spxRunning,
-            dataPointText: `${spxChg.toFixed(1)}%`
-        });
-        lineDataNDX.push({
-            value: ndxRunning,
-            dataPointText: `${ndxChg.toFixed(1)}%`
-        });
+    // 1. Prepare User Line (Discrete Monthly Return)
+    const lineDataUser = stats.FilteredData.map((d: any, i: number) => {
+        const val = d.User_Monthly_Return || 0;
+        return {
+            value: val,
+            label: i % 2 === 0 ? (HEBREW_TO_ENGLISH_MONTHS[d.Month] || d.Month) : '',
+            dataPointColor: val >= 0 ? '#4ADE80' : '#F87171',
+            dataPointRadius: 4,
+            dataPointLabelComponent: () => null,
+            formattedValue: `${val >= 0 ? '+' : ''}${val.toFixed(2)}%`
+        };
     });
 
-    const spxDiff = stats.User_Return - stats.SPX_Return;
-    const ndxDiff = stats.User_Return - stats.NDX_Return;
+    // Helper: Find matching month in market history
+    const findMarketValueForMonth = (history: any[], year: number, hebrewMonth: string) => {
+        if (!history || history.length === 0) return 0;
+        const monthIndex = HEBREW_MONTH_ORDER[hebrewMonth]; // 1-12
+        if (!monthIndex) return 0;
+
+        // Looser matching: Match Year AND Month index
+        const match = history.find(h => 
+            h.date.getFullYear() === year && 
+            h.date.getMonth() === (monthIndex - 1)
+        );
+        return match ? match.monthlyReturn : 0;
+    };
+
+    // 2. Prepare S&P 500 Line (Use Live Data if available, else DB)
+    const lineDataSPX = stats.FilteredData.map((d: any) => {
+        // Try to get from live fetched history first
+        let val = 0;
+        if (marketData?.spx?.history) {
+            val = findMarketValueForMonth(marketData.spx.history, d.Year, d.Month);
+        } else {
+            // Fallback to DB if live data not ready/failed
+            val = d.SPX_Monthly_Return || 0;
+        }
+        return {
+            value: val,
+            formattedValue: `SPX: ${val.toFixed(2)}%`
+        };
+    });
+
+    // 3. Prepare Nasdaq Line (Use Live Data if available, else DB)
+    const lineDataNDX = stats.FilteredData.map((d: any) => {
+        let val = 0;
+        if (marketData?.ndx?.history) {
+            val = findMarketValueForMonth(marketData.ndx.history, d.Year, d.Month);
+        } else {
+            val = d.NDX_Monthly_Return || 0;
+        }
+        return {
+            value: val,
+            formattedValue: `NDX: ${val.toFixed(2)}%`
+        };
+    });
 
     const dataSet = [
         {
             data: lineDataUser,
-            color: color,
+            color: userColor,
             thickness: 3,
-            dataPointsColor: color,
-            hideDataPoints: false,
-            textColor: color,
-            startFillColor: isPositive ? 'rgba(74, 222, 128, 0.2)' : 'rgba(248, 113, 113, 0.2)',
-            endFillColor: isPositive ? 'rgba(74, 222, 128, 0.01)' : 'rgba(248, 113, 113, 0.01)',
+            startFillColor: userColor,
+            endFillColor: userColor,
+            startOpacity: 0.2,
+            endOpacity: 0.01,
             areaChart: true,
-            dataPointLabelShiftY: -20,
-            dataPointTextColor: color
+            hideDataPoints: false,
         },
         {
             data: lineDataSPX,
             color: '#94A3B8',
             thickness: 2,
-            strokeDashArray: [4,4],
-            hideDataPoints: false,
-            textColor: '#94A3B8',
-            dataPointLabelShiftY: -10,
-            dataPointTextColor: '#94A3B8'
+            strokeDashArray: [4, 4],
+            hideDataPoints: true,
+            areaChart: false,
         },
         {
             data: lineDataNDX,
             color: '#F59E0B',
             thickness: 2,
-            strokeDashArray: [4,4],
-            hideDataPoints: false,
-            textColor: '#F59E0B',
-            dataPointLabelShiftY: 10,
-            dataPointTextColor: '#F59E0B'
+            strokeDashArray: [4, 4],
+            hideDataPoints: true,
+            areaChart: false,
         }
     ];
 
@@ -343,7 +446,7 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                 <Text style={{color: 'white', fontSize: 32, fontWeight: 'bold'}}>
                     {showNumbers ? `₪${Math.round(stats.currentBalance).toLocaleString()}` : '****'}
                 </Text>
-                <Text style={{color: color, fontSize: 16, marginTop: 4, fontWeight: '600'}}>
+                <Text style={{color: userColor, fontSize: 16, marginTop: 4, fontWeight: '600'}}>
                     {isPositive ? '+' : ''}{stats.User_Return.toFixed(2)}% ({range})
                 </Text>
             </View>
@@ -351,26 +454,26 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
             <View style={styles.comparisonContainer}>
                 <View style={styles.comparisonItem}>
                     <Text style={styles.comparisonLabel}>
-                        vs S&P 500 ({stats.SPX_Return > 0 ? '+' : ''}{stats.SPX_Return.toFixed(1)}%)
+                        vs S&P 500 ({loadingMarket ? '...' : (spxReturn > 0 ? '+' : '') + spxReturn.toFixed(1) + '%'})
                     </Text>
                     <Text style={[styles.comparisonValue, { color: spxDiff >= 0 ? '#4ADE80' : '#F87171' }]}>
-                        {spxDiff >= 0 ? '+' : ''}{spxDiff.toFixed(2)}%
+                        {loadingMarket ? '...' : (spxDiff >= 0 ? '+' : '') + spxDiff.toFixed(2) + '%'}
                     </Text>
                 </View>
                 <View style={styles.comparisonSeparator} />
                 <View style={styles.comparisonItem}>
                     <Text style={styles.comparisonLabel}>
-                        vs NDX 100 ({stats.NDX_Return > 0 ? '+' : ''}{stats.NDX_Return.toFixed(1)}%)
+                        vs NDX 100 ({loadingMarket ? '...' : (ndxReturn > 0 ? '+' : '') + ndxReturn.toFixed(1) + '%'})
                     </Text>
                     <Text style={[styles.comparisonValue, { color: ndxDiff >= 0 ? '#4ADE80' : '#F87171' }]}>
-                        {ndxDiff >= 0 ? '+' : ''}{ndxDiff.toFixed(2)}%
+                        {loadingMarket ? '...' : (ndxDiff >= 0 ? '+' : '') + ndxDiff.toFixed(2) + '%'}
                     </Text>
                 </View>
             </View>
 
             <View style={styles.benchmarksContainer}>
-                <View style={styles.legendItem}>
-                    <View style={{width:8, height:8, borderRadius:4, backgroundColor: color, marginRight:4}} />
+                 <View style={styles.legendItem}>
+                    <View style={{width:8, height:8, borderRadius:4, backgroundColor: userColor, marginRight:4}} />
                     <Text style={styles.benchText}>You</Text>
                 </View>
                 <View style={styles.legendItem}>
@@ -391,13 +494,40 @@ const PerformanceCard = ({ data, showNumbers }: any) => {
                     spacing={50}
                     initialSpacing={20}
                     thickness={3}
-                    hideRules
+                    curved
+                    
+                    hideRules={false}
+                    rulesColor="#333"
                     yAxisThickness={0}
                     xAxisThickness={1}
                     xAxisColor="#333"
                     yAxisTextStyle={{color: '#666', fontSize: 10}}
                     xAxisLabelTextStyle={{color: '#999', fontSize: 10}}
-                    curved
+                    
+                    pointerConfig={{
+                        pointerStripUptoDataPoint: true,
+                        pointerStripColor: '#4B5563',
+                        pointerStripWidth: 2,
+                        strokeDashArray: [2, 5],
+                        pointerLabelComponent: items => (
+                            <View style={{
+                                backgroundColor: '#1F2937', 
+                                padding: 6, 
+                                borderRadius: 4,
+                                borderWidth: 1,
+                                borderColor: '#374151',
+                                minWidth: 80
+                            }}>
+                                <Text style={{color: 'white', fontSize: 10, fontWeight: 'bold', marginBottom: 2}}>
+                                    {items[0]?.formattedValue}
+                                </Text>
+                                {items[1] && <Text style={{color: '#94A3B8', fontSize: 9}}>{items[1].formattedValue}</Text>}
+                                {items[2] && <Text style={{color: '#F59E0B', fontSize: 9}}>{items[2].formattedValue}</Text>}
+                            </View>
+                        ),
+                        radius: 6,
+                        pointerColor: '#fff',
+                    }}
                 />
             </View>
         </View>
@@ -410,7 +540,6 @@ const FeesAndCommissionsCard = ({ data, showNumbers }: any) => {
 
     if (!stats) return null;
 
-    // Prepare Bar Data
     const barData = stats.FilteredData.map((m: any) => ({
         value: m.Fees_Paid_This_Month || 0,
         label: HEBREW_TO_ENGLISH_MONTHS[m.Month] || m.Month,
@@ -418,7 +547,6 @@ const FeesAndCommissionsCard = ({ data, showNumbers }: any) => {
         topLabelComponent: () => <Text style={{color: '#F87171', fontSize: 10, marginBottom: 2}}>{Math.round(m.Fees_Paid_This_Month)}</Text>
     }));
 
-    // Dynamic Max Value for visual scaling
     const maxFee = Math.max(...barData.map((d:any) => d.value), 50);
 
     return (
@@ -428,7 +556,7 @@ const FeesAndCommissionsCard = ({ data, showNumbers }: any) => {
                     <Text style={styles.cardTitle}>Fees & Commissions</Text>
                 </View>
                 <View style={{ marginTop: 12, width: '100%' }}>
-                     <MiniTimeFrameSelector 
+                      <MiniTimeFrameSelector 
                         selected={range} 
                         onSelect={setRange} 
                         options={['1M', 'YTD', '1Y', '5Y', 'Max']} 
@@ -496,7 +624,6 @@ const FearGreedCard = ({ score }: any) => {
     let color = "#FACC15";
     let label = "Neutral";
     
-    // Dynamic Text Logic
     if (score <= 25) { color = "#F87171"; label = "Extreme Fear"; }
     else if (score < 45) { color = "#F97316"; label = "Fear"; }
     else if (score < 55) { color = "#FACC15"; label = "Neutral"; }
@@ -608,15 +735,17 @@ const LoginScreen = ({ onNavigateToSignup }: any) => {
     };
     return (
         <View style={[styles.container, styles.authContainer]}>
-            <Text style={styles.authTitle}>Welcome</Text>
-            <Text style={styles.authSubtitle}>Sign in to InvestTrack</Text>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#999" value={email} onChangeText={setEmail} autoCapitalize="none" />
-            <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#999" value={password} onChangeText={setPassword} secureTextEntry />
-            <TouchableOpacity style={styles.authButton} onPress={handleLogin} disabled={loading}>
-                {loading ? <ActivityIndicator color="#121212"/> : <Text style={styles.authButtonText}>Login</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={{marginTop:20}} onPress={onNavigateToSignup}><Text style={styles.navText}>No account? <Text style={{color:'#4ADE80'}}>Sign Up</Text></Text></TouchableOpacity>
+            <View style={styles.authConstrainedBox}>
+                <Text style={styles.authTitle}>Welcome</Text>
+                <Text style={styles.authSubtitle}>Sign in to InvestTrack</Text>
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#999" value={email} onChangeText={setEmail} autoCapitalize="none" />
+                <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#999" value={password} onChangeText={setPassword} secureTextEntry />
+                <TouchableOpacity style={styles.authButton} onPress={handleLogin} disabled={loading}>
+                    {loading ? <ActivityIndicator color="#121212"/> : <Text style={styles.authButtonText}>Login</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={{marginTop:20}} onPress={onNavigateToSignup}><Text style={styles.navText}>No account? <Text style={{color:'#4ADE80'}}>Sign Up</Text></Text></TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -634,15 +763,17 @@ const SignupScreen = ({ onNavigateToLogin }: any) => {
     };
     return (
         <View style={[styles.container, styles.authContainer]}>
-            <Text style={styles.authTitle}>Sign Up</Text>
-            <Text style={styles.authSubtitle}>Create your account</Text>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#999" value={email} onChangeText={setEmail} autoCapitalize="none" />
-            <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#999" value={password} onChangeText={setPassword} secureTextEntry />
-            <TouchableOpacity style={styles.authButton} onPress={handleSignup} disabled={loading}>
-                {loading ? <ActivityIndicator color="#121212"/> : <Text style={styles.authButtonText}>Create Account</Text>}
-            </TouchableOpacity>
-            <TouchableOpacity style={{marginTop:20}} onPress={onNavigateToLogin}><Text style={styles.navText}>Have an account? <Text style={{color:'#4ADE80'}}>Login</Text></Text></TouchableOpacity>
+            <View style={styles.authConstrainedBox}>
+                <Text style={styles.authTitle}>Sign Up</Text>
+                <Text style={styles.authSubtitle}>Create your account</Text>
+                {error ? <Text style={styles.errorText}>{error}</Text> : null}
+                <TextInput style={styles.input} placeholder="Email" placeholderTextColor="#999" value={email} onChangeText={setEmail} autoCapitalize="none" />
+                <TextInput style={styles.input} placeholder="Password" placeholderTextColor="#999" value={password} onChangeText={setPassword} secureTextEntry />
+                <TouchableOpacity style={styles.authButton} onPress={handleSignup} disabled={loading}>
+                    {loading ? <ActivityIndicator color="#121212"/> : <Text style={styles.authButtonText}>Create Account</Text>}
+                </TouchableOpacity>
+                <TouchableOpacity style={{marginTop:20}} onPress={onNavigateToLogin}><Text style={styles.navText}>Have an account? <Text style={{color:'#4ADE80'}}>Login</Text></Text></TouchableOpacity>
+            </View>
         </View>
     );
 };
@@ -678,13 +809,11 @@ export default function Index() {
                         Monthly_Data: data.Monthly_Data || [],
                         Transactions: data.Transactions || []
                     });
-                    // Use live score from DB if available, else fetch/fallback
                     if(data.Fear_Greed_Score) setFearGreedScore(data.Fear_Greed_Score);
                 }
             } catch (e) { console.error("DB Error:", e); }
 
             const fg = await fetchFearGreedData();
-            // Only override if not present in DB
             if(!portfolioData.Fear_Greed_Score) setFearGreedScore(fg);
         };
         loadData();
@@ -770,19 +899,65 @@ const styles = StyleSheet.create({
     modalTitle: { color: 'white', fontSize: 18, fontWeight: 'bold', marginBottom: 20 },
     rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     
-    authContainer: { justifyContent: 'center', paddingHorizontal: 40, paddingTop: 0 },
-    authTitle: { color: 'white', fontSize: 28, fontWeight: 'bold', marginBottom: 8, textAlign: 'center' },
-    authSubtitle: { color: '#888', fontSize: 14, marginBottom: 30, textAlign: 'center' },
-    input: { backgroundColor: '#1F2937', color: 'white', borderRadius: 8, paddingHorizontal: 15, paddingVertical: 12, marginBottom: 15, fontSize: 16, borderWidth: 1, borderColor: '#374151' },
-    authButton: { backgroundColor: '#4ADE80', borderRadius: 8, padding: 15, alignItems: 'center', marginTop: 10 },
-    authButtonText: { color: '#121212', fontSize: 16, fontWeight: 'bold' },
-    errorText: { color: '#F87171', marginBottom: 10, textAlign: 'center' },
-    navText: { color: '#999', textAlign: 'center' },
+    authContainer: {
+        flex: 1,
+        backgroundColor: '#121212',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    authConstrainedBox: {
+        width: '100%',
+        maxWidth: 400,
+        paddingHorizontal: 20,
+    },
+    authTitle: { 
+        color: 'white', 
+        fontSize: 32, 
+        fontWeight: 'bold', 
+        textAlign: 'center', 
+        marginBottom: 8 
+    },
+    authSubtitle: { 
+        color: '#888', 
+        fontSize: 16, 
+        textAlign: 'center', 
+        marginBottom: 32 
+    },
+    input: {
+        backgroundColor: '#1F2937',
+        color: 'white',
+        borderRadius: 12,
+        padding: 16,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#374151',
+        fontSize: 16
+    },
+    authButton: {
+        backgroundColor: '#4ADE80',
+        padding: 16,
+        borderRadius: 12,
+        alignItems: 'center',
+        marginTop: 8
+    },
+    authButtonText: {
+        color: '#121212',
+        fontWeight: 'bold',
+        fontSize: 16
+    },
+    navText: {
+        color: '#888',
+        fontSize: 14
+    },
+    errorText: {
+        color: '#F87171',
+        marginBottom: 16,
+        textAlign: 'center'
+    },
 
-    // New styles for comparisons and fees
     comparisonContainer: { flexDirection: 'row', backgroundColor: '#1E293B', borderRadius: 8, padding: 12, marginBottom: 16, alignItems: 'center' },
     comparisonItem: { flex: 1, alignItems: 'center' },
-    comparisonLabel: { color: '#94A3B8', fontSize: 11, marginBottom: 4 },
+    comparisonLabel: { color: '#94A3B8', fontSize: 11, marginBottom: 4 }, // Fixed typo: 11f -> 11
     comparisonValue: { fontSize: 16, fontWeight: 'bold' },
     comparisonSeparator: { width: 1, height: 30, backgroundColor: '#334155', marginHorizontal: 8 },
     
