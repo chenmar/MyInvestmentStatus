@@ -115,7 +115,7 @@ else:
 
 # Chrome Options
 chrome_options = Options()
-script_profile_dir = os.path.join(TARGET_DIR, "chrome_profile")
+script_profile_dir = os.path.join(TARGET_DIR, "chrome_profile_yields")
 chrome_options.add_argument(f"--user-data-dir={script_profile_dir}")
 chrome_options.add_argument("--log-level=3") 
 chrome_options.add_argument("--silent")

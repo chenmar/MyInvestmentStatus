@@ -139,7 +139,7 @@ else:
 
 # Chrome Options
 chrome_options = Options()
-script_profile_dir = os.path.join(TARGET_DIR, "chrome_profile")
+script_profile_dir = os.path.join(TARGET_DIR, "chrome_profile_fees")
 os.makedirs(script_profile_dir, exist_ok=True)
 chrome_options.add_argument(f"--user-data-dir={script_profile_dir}")
 chrome_options.add_argument("--log-level=3") 
